@@ -6,6 +6,7 @@ export class LogReaderController extends AbstractBaseController<HTMLDivElement> 
 	private uploadButton = factory(function () {
 		let elm = document.createElement('input');
 		elm.type = 'file';
+		elm.multiple = true;
 
 		return elm
 	});
@@ -28,6 +29,7 @@ export class LogReaderController extends AbstractBaseController<HTMLDivElement> 
 
 	private groupRunDetails = factory(function () {
 		let elm = document.createElement('output');
+		elm.style.whiteSpace = 'pre';
 
 		return elm
 	});
@@ -62,21 +64,34 @@ export class LogReaderController extends AbstractBaseController<HTMLDivElement> 
 			const g = groupers(this.groupers.value);
 			const grouperMap = g.map(g => { return { g: g, seen: 0 } });
 
+			let unmatched = 0;
+
 			for (const file of Array.from(this.uploadButton.files ?? [])) {
 				for await (const log of getLogs(file)) {
 					let matched = false;
+					let show = true;
 					for (const i in grouperMap) {
 						if (grouperMap[i].g.matches(log)) {
 							matched = true;
 							grouperMap[i].seen++;
+							if (grouperMap[i].seen > 1) {
+								show = false;
+							}
 						}
 					}
 
 					if (!matched) {
+						unmatched++;
+					}
+
+					if (show) {
 						console.log(log); // External iteration and processing of each line
 					}
 				}
 			}
+
+			this.groupRunDetails.textContent = grouperMap.map(g => `${g.g.pattern}: ${g.seen}`).join('\n');
+			this.groupRunDetails.textContent += `\n\nUngrouped: ${unmatched}`;
 		});
 
 		this.groupers.value = localStorage.getItem('groupers') ?? '';
@@ -92,14 +107,14 @@ function groupers(text: string) {
 
 class Grouper {
 
-	private pattern: RegExp;
+	private reg: RegExp;
 
-	constructor(pattern: string) {
-		this.pattern = new RegExp(pattern);
+	constructor(public readonly pattern: string) {
+		this.reg = new RegExp(pattern);
 	}
 
 	public matches(log: string): boolean {
-		return this.pattern.test(log);
+		return this.reg.test(log);
 	}
 }
 
