@@ -1,6 +1,6 @@
-export function factory<T>(
-	f: (...args: any[]) => T,
-	...args: any[]
+export function factory<T, Args extends unknown[]>(
+	f: (...args: Args) => T,
+	...args: Args
 ): T {
 	return f(...args);
 }
