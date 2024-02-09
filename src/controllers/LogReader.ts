@@ -138,6 +138,10 @@ async function* getLogs(file: File): AsyncGenerator<string> {
 			log += "\n" + line;
 		}
 	}
+
+	if (log) {
+		yield log;
+	}
 }
 
 async function* getLines(file: File): AsyncGenerator<string> {
