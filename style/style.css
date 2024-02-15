@@ -98,5 +98,11 @@ body {
 .log-reader--controller > .log-item-output > .log-item-group {
   background: lightgreen;
 }
+.log-reader--controller > .log-item-output button {
+  display: block;
+  background: transparent;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  margin-top: 5px;
+}
 
 /*# sourceMappingURL=style.css.map */

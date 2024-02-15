@@ -1,5 +1,6 @@
 import { AbstractBaseController, factory, labelFor } from "../AbstractController";
 import { PhpErrorLog } from "../logtypes/php-error";
+import { getLogs } from "../io";
 
 export class LogReaderController extends AbstractBaseController {
 
@@ -55,7 +56,7 @@ export class LogReaderController extends AbstractBaseController {
 	private groupRunDetails = factory(function () {
 		let elm = document.createElement('output');
 		elm.classList.add('group-run-details');
-		elm.style.whiteSpace = 'pre';
+		elm.style.whiteSpace = 'pre-wrap';
 
 		return elm
 	});
@@ -63,7 +64,7 @@ export class LogReaderController extends AbstractBaseController {
 	private logItemOutput = factory(function () {
 		let elm = document.createElement('output');
 		elm.classList.add('log-item-output');
-		elm.style.whiteSpace = 'pre';
+		elm.style.whiteSpace = 'pre-wrap';
 
 		return elm
 	});
@@ -110,7 +111,8 @@ export class LogReaderController extends AbstractBaseController {
 				let ungrouped = 0;
 
 				for (const file of Array.from(this.uploadButton.files ?? [])) {
-					for await (const log of getLogs(file, logType)) {
+					for await (const logEntry of getLogs(file, logType)) {
+						const log = logEntry.getRawEntry();
 						if (e.some(e => e.matches(log))) {
 							continue;
 						}
@@ -139,7 +141,18 @@ export class LogReaderController extends AbstractBaseController {
 						if (show) {
 							let logItem = document.createElement('div');
 							logItem.classList.add('log-item');
-							logItem.textContent = log;
+							logItem.textContent = logEntry.getMessage();
+
+							if(logEntry.hasDetails()) {
+								let b = document.createElement('button')
+								b.textContent = 'Details';
+								b.addEventListener('click', () => {
+									alert(logEntry.getRawEntry());
+								});
+
+								logItem.append(b);
+							}
+
 							if (grouped) {
 								let group = document.createElement('article');
 								group.classList.add('log-item-group');
@@ -187,57 +200,3 @@ class Log {
 	constructor(public log: string) { }
 }
 
-
-
-export interface LogType {
-	smellsLikeLogLine(line: string): boolean;
-}
-
-async function* getLogs(file: File, type: LogType): AsyncGenerator<string> {
-	let log = "";
-	for await (const line of getLines(file)) {
-		if (type.smellsLikeLogLine(line)) {
-			if (log) {
-				yield log;
-			}
-			log = line;
-		} else {
-			log += "\n" + line;
-		}
-	}
-
-	if (log) {
-		yield log;
-	}
-}
-
-async function* getLines(file: File): AsyncGenerator<string> {
-	const decoder = new TextDecoder("utf-8");
-	const reader = file.stream().getReader();
-
-	let { value: rawChunk, done: readerDone } = await reader.read();
-	let chunkText = rawChunk ? decoder.decode(rawChunk, { stream: true }) : "";
-
-	const re = /\r\n|\n|\r/gm;
-	let startIndex = 0;
-
-	while (true) {
-		const result = re.exec(chunkText);
-		if (!result) {
-			if (readerDone) {
-				break;
-			}
-			const remainder = chunkText.substr(startIndex);
-			({ value: rawChunk, done: readerDone } = await reader.read());
-			chunkText = remainder + (rawChunk ? decoder.decode(rawChunk, { stream: true }) : "");
-			startIndex = 0;
-			continue;
-		}
-		yield chunkText.substring(startIndex, result.index); // Yielding each line
-		startIndex = re.lastIndex;
-	}
-	// Yield any remaining line after the last newline character
-	if (startIndex < chunkText.length) {
-		yield chunkText.substr(startIndex);
-	}
-}

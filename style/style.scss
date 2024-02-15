@@ -52,6 +52,13 @@ body {
 		> .log-item-group {
 			background: lightgreen;
 		}
+
+		button {
+			display: block;
+			background: transparent;
+			border: 1px solid rgba(0,0,0,.3);
+			margin-top: 5px;
+		}
 	}
 
 
