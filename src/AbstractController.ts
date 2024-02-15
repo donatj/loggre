@@ -1,19 +1,19 @@
 
-export interface ControllerInterface {
+export interface ControllerInterface<T extends HTMLElement = HTMLElement> {
 	// attach(elm: HTMLElement): void;
 	getContainer(): HTMLElement;
 }
 
-export abstract class AbstractBaseController implements ControllerInterface {
+export abstract class AbstractBaseController<T extends HTMLElement = HTMLElement> implements ControllerInterface<T> {
 
-	protected container: HTMLElement;
+	protected container: T;
 
 	constructor(
 		private name: string,
-		container: HTMLElement | keyof HTMLElementTagNameMap = "div",
+		container: T | keyof HTMLElementTagNameMap = "div",
 	) {
 		if (typeof container === 'string') {
-			this.container = document.createElement(container);
+			this.container = document.createElement(container) as T;
 		} else {
 			this.container = container;
 		}
