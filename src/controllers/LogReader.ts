@@ -1,25 +1,25 @@
-import { AbstractBaseController, factory, labelFor } from "../AbstractController";
+import { AbstractBaseController, labelFor } from "../AbstractController";
 import { PhpErrorLog } from "../logtypes/php-error";
 import { getLogs } from "../io";
 import { LogEntry } from "../logtypes/Logs";
 
 class LogDetailsDialog extends AbstractBaseController<HTMLDialogElement> {
 
-	private output = factory(function () {
+	private output = (() => {
 		let elm = document.createElement('output');
 		elm.classList.add('details-output');
 		elm.style.whiteSpace = 'pre-wrap';
 
 		return elm
-	});
+	})();
 
-	private hideButton = factory(function () {
+	private hideButton = (() => {
 		let elm = document.createElement('button');
 		elm.textContent = 'Close';
 
 		return elm
-	});
-	
+	})();
+
 	constructor() {
 		super("details-dialog", document.createElement('dialog'));
 
@@ -42,15 +42,15 @@ class LogDetailsDialog extends AbstractBaseController<HTMLDialogElement> {
 
 export class LogReaderController extends AbstractBaseController {
 
-	private uploadButton = factory(function () {
+	private uploadButton = (() => {
 		let elm = document.createElement('input');
 		elm.type = 'file';
 		elm.multiple = true;
 
 		return elm
-	});
+	})();
 
-	private groupers = factory(function () {
+	private groupers = (() => {
 		let elm = document.createElement('textarea');
 
 		elm.value = localStorage.getItem('groupers') ?? '';
@@ -59,9 +59,9 @@ export class LogReaderController extends AbstractBaseController {
 		});
 
 		return elm
-	});
+	})();
 
-	private exclusions = factory(function () {
+	private exclusions = (() => {
 		let elm = document.createElement('textarea');
 
 		elm.value = localStorage.getItem('exclusions') ?? '';
@@ -70,9 +70,9 @@ export class LogReaderController extends AbstractBaseController {
 		});
 
 		return elm
-	});
+	})();
 
-	private inclusions = factory(function () {
+	private inclusions = (() => {
 		let elm = document.createElement('textarea');
 
 		elm.value = localStorage.getItem('inclusions') ?? '';
@@ -81,32 +81,32 @@ export class LogReaderController extends AbstractBaseController {
 		});
 
 		return elm
-	});
+	})();
 
-	private runButton = factory(function () {
+	private runButton = (() => {
 		let elm = document.createElement('button');
 		elm.textContent = 'Run';
 		elm.disabled = true;
 
 		return elm
-	});
+	})();
 
-	private logItemOutput = factory(function () {
+	private logItemOutput = (() => {
 		let elm = document.createElement('output');
 		elm.classList.add('log-item-output');
 		elm.style.whiteSpace = 'pre-wrap';
 
 		return elm
-	});
+	})();
 
-	private progressbar = factory(function () {
+	private progressbar = (() => {
 		let elm = document.createElement('progress');
 		elm.value = 100;
 		elm.max = 100;
 		elm.style.width = '100%';
 
 		return elm
-	});
+	})();
 
 	private detailsDialog = new LogDetailsDialog;
 
@@ -132,7 +132,7 @@ export class LogReaderController extends AbstractBaseController {
 			this.logItemOutput,
 			this.detailsDialog.getContainer()
 		);
-		
+
 		this.uploadButton.addEventListener('change', () => {
 			this.runButton.disabled = !this.uploadButton.files?.length;
 		});
@@ -147,10 +147,17 @@ export class LogReaderController extends AbstractBaseController {
 				const i = matchers(this.inclusions.value, Includer);
 				const g = matchers(this.groupers.value, Grouper);
 
-				const grouperMap = g.map(g => { return { g: g, seen: 0, seenElm: factory(()=>{
-					let elm = document.createElement('h5');
-					return elm;
-				}) } });
+				const grouperMap = g.map(g => {
+					return {
+						g: g,
+						seen: 0,
+						seenElm: (() => {
+							let elm = document.createElement('h1');
+							return elm;
+						})(),
+					}
+				});
+				type GrouperMapItem = typeof grouperMap[number];
 
 				let ungrouped = 0;
 
@@ -170,23 +177,22 @@ export class LogReaderController extends AbstractBaseController {
 							continue;
 						}
 
-						let grouped = false;
-						let groupSeenElm : HTMLElement | null = null;
+						let group: GrouperMapItem | null = null;
 						let show = true;
 						for (const i in grouperMap) {
 							if (grouperMap[i].g.matches(log)) {
-								groupSeenElm = grouperMap[i].seenElm;
-								grouped = true;
-								grouperMap[i].seen++;
-								groupSeenElm.textContent = `Group '${grouperMap[i].g.pattern}' matched: ${grouperMap[i].seen} times.`;
-								if (grouperMap[i].seen > 1) {
+								group = grouperMap[i];
+								group.seen++;
+
+								group.seenElm.textContent = `Group '${group.g.pattern}' matched ${new Intl.NumberFormat().format(group.seen)} times.`;
+								if (group.seen > 1) {
 									show = false;
 								}
 								break;
 							}
 						}
 
-						if (!grouped) {
+						if (!group) {
 							ungrouped++;
 						}
 
@@ -198,20 +204,38 @@ export class LogReaderController extends AbstractBaseController {
 								logItem.textContent += "\n ... [details]";
 							}
 
-							logItem.addEventListener('click', () => {
+							const dateElm = document.createElement('time');
+							const date = logEntry.getDate()
+							dateElm.dateTime = date.toISOString();
+							dateElm.textContent = date.toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short' })
+							logItem.prepend(dateElm);
+
+							logItem.addEventListener('click', (e) => {
+								// this lets you select text in the log item without triggering the details dialog
+								const cellText = document.getSelection();
+								if (cellText.type === 'Range') {
+									e.stopPropagation();
+									return;
+								}
+
 								this.detailsDialog.showDetails(logEntry);
 							});
 
-							if (grouped) {
-								let group = document.createElement('article');
-								group.classList.add('log-item-group');
-								group.append(
-									groupSeenElm, 
+							if (group) {
+								const groupElm = document.createElement('article');
+								groupElm.classList.add('log-item-group');
+								groupElm.append(
+									group.seenElm,
+									(() => {
+										const elm = document.createElement('h2');
+										elm.textContent = 'Example:';
+										return elm;
+									})(),
 									document.createElement('br'),
 									logItem
 								);
-								
-								this.logItemOutput.append(group);
+
+								this.logItemOutput.append(groupElm);
 							} else {
 								this.logItemOutput.append(logItem);
 							}

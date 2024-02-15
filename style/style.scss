@@ -67,6 +67,12 @@ output {
 		background: lightblue;
 		overflow-x: auto;
 
+		time {
+			display: block;
+			font-size: .8em;
+			color: rgba(0,0,0,.5);
+		}
+
 		> * {
 			border-bottom: 1px solid black;
 			padding: 11px 0;

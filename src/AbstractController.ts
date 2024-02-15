@@ -27,13 +27,6 @@ export abstract class AbstractBaseController<T extends HTMLElement = HTMLElement
 
 }
 
-export function factory<T, Args extends unknown[]>(
-	f: (...args: Args) => T,
-	...args: Args
-): T {
-	return f(...args);
-}
-
 export function labelFor(label: string, input: HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement) {
 	if (input.id === '') {
 		input.id = makeUniqueId();		
