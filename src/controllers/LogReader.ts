@@ -1,7 +1,7 @@
-import { AbstractBaseController } from "../AbstractController";
-import { factory } from "../Factory";
+import { AbstractBaseController, factory, labelFor } from "../AbstractController";
+import { PhpErrorLog } from "../logtypes/php-error";
 
-export class LogReaderController extends AbstractBaseController<HTMLDivElement> {
+export class LogReaderController extends AbstractBaseController {
 
 	private uploadButton = factory(function () {
 		let elm = document.createElement('input');
@@ -13,8 +13,33 @@ export class LogReaderController extends AbstractBaseController<HTMLDivElement> 
 
 	private groupers = factory(function () {
 		let elm = document.createElement('textarea');
-		elm.style.width = '300px';
-		elm.style.height = '400px';
+
+		elm.value = localStorage.getItem('groupers') ?? '';
+		elm.addEventListener('input', () => {
+			localStorage.setItem('groupers', elm.value);
+		});
+
+		return elm
+	});
+
+	private exclusions = factory(function () {
+		let elm = document.createElement('textarea');
+
+		elm.value = localStorage.getItem('exclusions') ?? '';
+		elm.addEventListener('input', () => {
+			localStorage.setItem('exclusions', elm.value);
+		});
+
+		return elm
+	});
+
+	private inclusions = factory(function () {
+		let elm = document.createElement('textarea');
+
+		elm.value = localStorage.getItem('inclusions') ?? '';
+		elm.addEventListener('input', () => {
+			localStorage.setItem('inclusions', elm.value);
+		});
 
 		return elm
 	});
@@ -29,29 +54,41 @@ export class LogReaderController extends AbstractBaseController<HTMLDivElement> 
 
 	private groupRunDetails = factory(function () {
 		let elm = document.createElement('output');
+		elm.classList.add('group-run-details');
+		elm.style.whiteSpace = 'pre';
+
+		return elm
+	});
+
+	private logItemOutput = factory(function () {
+		let elm = document.createElement('output');
+		elm.classList.add('log-item-output');
 		elm.style.whiteSpace = 'pre';
 
 		return elm
 	});
 
 	constructor() {
-		super(document.createElement('div'), "log-reader");
+		super("log-reader", "main");
 
-		this.container.style.display = 'flex';
+		const logType = new PhpErrorLog;
 
 		let fieldset = document.createElement('fieldset');
 
 		fieldset.append(
 			this.uploadButton,
 			document.createElement('br'),
-			this.groupers,
+			...labelFor('Exclusions', this.exclusions),
+			...labelFor('Inclusions', this.inclusions),
+			...labelFor('Groupers', this.groupers),
 			document.createElement('br'),
 			this.runButton
 		);
 
 		this.container.append(
 			fieldset,
-			this.groupRunDetails
+			this.groupRunDetails,
+			this.logItemOutput
 		);
 
 		this.uploadButton.addEventListener('change', () => {
@@ -59,53 +96,77 @@ export class LogReaderController extends AbstractBaseController<HTMLDivElement> 
 		});
 
 		this.runButton.addEventListener('click', async () => {
-			console.clear();
+			fieldset.disabled = true;
 
-			const g = groupers(this.groupers.value);
-			const grouperMap = g.map(g => { return { g: g, seen: 0 } });
+			this.logItemOutput.textContent = '';
 
-			let unmatched = 0;
+			setTimeout(async () => {
+				const e = matchers(this.exclusions.value, Excluder);
+				const i = matchers(this.inclusions.value, Includer);
+				const g = matchers(this.groupers.value, Grouper);
+	
+				const grouperMap = g.map(g => { return { g: g, seen: 0 } });
+	
+				let ungrouped = 0;
 
-			for (const file of Array.from(this.uploadButton.files ?? [])) {
-				for await (const log of getLogs(file)) {
-					let matched = false;
-					let show = true;
-					for (const i in grouperMap) {
-						if (grouperMap[i].g.matches(log)) {
-							matched = true;
-							grouperMap[i].seen++;
-							if (grouperMap[i].seen > 1) {
-								show = false;
+				for (const file of Array.from(this.uploadButton.files ?? [])) {
+					for await (const log of getLogs(file, logType)) {
+						if (e.some(e => e.matches(log))) {
+							continue;
+						}
+
+						if (i.length > 0 && i.some(i => !i.matches(log))) {
+							continue;
+						}
+
+						let grouped = false;
+						let show = true;
+						for (const i in grouperMap) {
+							if (grouperMap[i].g.matches(log)) {
+								grouped = true;
+								grouperMap[i].seen++;
+								if (grouperMap[i].seen > 1) {
+									show = false;
+								}
+								break;
 							}
 						}
-					}
 
-					if (!matched) {
-						unmatched++;
-					}
+						if (!grouped) {
+							ungrouped++;
+						}
 
-					if (show) {
-						console.log(log); // External iteration and processing of each line
+						if (show) {
+							let logItem = document.createElement('div');
+							logItem.classList.add('log-item');
+							logItem.textContent = log;
+							if (grouped) {
+								let group = document.createElement('article');
+								group.classList.add('log-item-group');
+								group.append(logItem);
+								this.logItemOutput.append(group);
+							}else{
+								this.logItemOutput.append(logItem);
+							}
+							// this.logItemOutput.textContent += log + '\n';
+						}
 					}
 				}
-			}
 
-			this.groupRunDetails.textContent = grouperMap.map(g => `${g.g.pattern}: ${g.seen}`).join('\n');
-			this.groupRunDetails.textContent += `\n\nUngrouped: ${unmatched}`;
-		});
+				this.groupRunDetails.textContent = grouperMap.map(g => `${g.g.pattern}: ${g.seen}`).join('\n');
+				this.groupRunDetails.textContent += `\n\nUngrouped: ${ungrouped}`;
 
-		this.groupers.value = localStorage.getItem('groupers') ?? '';
-		this.groupers.addEventListener('input', () => {
-			localStorage.setItem('groupers', this.groupers.value);
+				fieldset.disabled = false;
+			}, 0);
 		});
 	}
 }
 
-function groupers(text: string) {
-	return text.split('\n').map(line => new Grouper(line));
+function matchers(text: string, m: typeof Matcher = Matcher) {
+	return text.trim().split('\n').filter((v) => v.trim() != '').map(line => new m(line));
 }
 
-class Grouper {
+class Matcher {
 
 	private reg: RegExp;
 
@@ -118,18 +179,24 @@ class Grouper {
 	}
 }
 
+class Grouper extends Matcher {}
+class Excluder extends Matcher {}
+class Includer extends Matcher {}
+
 class Log {
 	constructor(public log: string) { }
 }
 
-function smellsLikeLogLine(line: string): boolean {
-	return line[0] === '[';
+
+
+export interface LogType {
+	smellsLikeLogLine(line: string): boolean;
 }
 
-async function* getLogs(file: File): AsyncGenerator<string> {
+async function* getLogs(file: File, type: LogType): AsyncGenerator<string> {
 	let log = "";
 	for await (const line of getLines(file)) {
-		if (smellsLikeLogLine(line)) {
+		if (type.smellsLikeLogLine(line)) {
 			if (log) {
 				yield log;
 			}

@@ -1,27 +1,25 @@
 
-export interface ControllerInterface<T extends HTMLElement> {
+export interface ControllerInterface {
 	// attach(elm: HTMLElement): void;
-	getContainer(): T;
+	getContainer(): HTMLElement;
 }
 
-export abstract class AbstractBaseController<T extends HTMLElement> implements ControllerInterface<T> {
-	constructor(protected container: T, protected name: string) {
-		this.container.classList.add(`${name}--controller`);
+export abstract class AbstractBaseController implements ControllerInterface {
+
+	protected container: HTMLElement;
+
+	constructor(
+		private name: string,
+		container: HTMLElement | keyof HTMLElementTagNameMap = "div",
+	) {
+		if (typeof container === 'string') {
+			this.container = document.createElement(container);
+		} else {
+			this.container = container;
+		}
+
+		this.container.classList.add(`${this.name}--controller`);
 	}
-
-	// public attach(elm: HTMLElement): void {
-	// 	elm.appendChild(this.container);
-	// }
-
-	// public detach(elm: HTMLElement): boolean {
-	// 	try {
-	// 		elm.removeChild(this.container);
-	// 	} catch (e) {
-	// 		return false;
-	// 	}
-
-	// 	return true;
-	// }
 
 	public getContainer() {
 		return this.container;
@@ -29,3 +27,25 @@ export abstract class AbstractBaseController<T extends HTMLElement> implements C
 
 }
 
+export function factory<T, Args extends unknown[]>(
+	f: (...args: Args) => T,
+	...args: Args
+): T {
+	return f(...args);
+}
+
+export function labelFor(label: string, input: HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement) {
+	if (input.id === '') {
+		input.id = makeUniqueId();		
+	}
+	
+	let labelElm = document.createElement('label');
+	labelElm.textContent = label;
+	labelElm.htmlFor = input.id;
+	
+	return [labelElm, input];
+}
+
+export function makeUniqueId() {
+	return "id-" + Math.random().toString(36).substring(2) + '-' + Date.now().toString(36);
+}

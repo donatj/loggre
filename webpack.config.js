@@ -33,6 +33,7 @@ const config = {
     resolve: {
         extensions: ['.tsx', '.ts', '.jsx', '.js', '...'],
     },
+    devtool: 'inline-source-map',
 };
 
 module.exports = () => {
