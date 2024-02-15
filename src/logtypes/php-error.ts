@@ -26,6 +26,10 @@ export class PhpErrorLogEntry implements LogEntry {
 		return this.log.match(/(?<=] ).*/)[0];
 	}
 
+	getDate() : Date {
+		return new Date(this.log.match(/\[(.*?)\]/)[1]);
+	}
+
 	hasDetails() : boolean {
 		return this.log.includes("\n");
 	}

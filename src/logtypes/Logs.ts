@@ -8,5 +8,6 @@ export interface LogType {
 export interface LogEntry {
 	getRawEntry() : string;
 	getMessage() : string;
+	getDate() : Date;
 	hasDetails() : boolean;
 }
