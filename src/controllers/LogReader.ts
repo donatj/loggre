@@ -1,7 +1,7 @@
 import { AbstractBaseController, labelFor } from "../AbstractController";
 import { PhpErrorLog } from "../logtypes/php-error";
 import { getLogs } from "../io";
-import { LogEntry } from "../logtypes/Logs";
+import { LogEntry, LogType } from "../logtypes/Logs";
 
 class LogDetailsDialog extends AbstractBaseController<HTMLDialogElement> {
 
@@ -139,8 +139,7 @@ export class LogReaderController extends AbstractBaseController {
 
 		this.runButton.addEventListener('click', async () => {
 			fieldset.disabled = true;
-
-			this.logItemOutput.textContent = '';
+			this.logItemOutput.innerHTML = '';
 
 			setTimeout(async () => {
 				const e = matchers(this.exclusions.value, Excluder);
@@ -164,81 +163,81 @@ export class LogReaderController extends AbstractBaseController {
 				const files = Array.from(this.uploadButton.files ?? []);
 				this.progressbar.style.visibility = '';
 				this.progressbar.max = files.length;
-				for (const file of files) {
-					this.progressbar.value = files.indexOf(file) + 1;
 
-					for await (const logEntry of getLogs(file, logType)) {
-						const log = logEntry.getRawEntry();
-						if (e.some(e => e.matches(log))) {
-							continue;
-						}
+				for await (const logEntry of getAllLogs(files, logType, (numerator: number, denominator: number) => {
+					this.progressbar.value = numerator;
+					this.progressbar.max = denominator;
+				})) {
+					const log = logEntry.getRawEntry();
+					if (e.some(e => e.matches(log))) {
+						continue;
+					}
 
-						if (i.length > 0 && i.some(i => !i.matches(log))) {
-							continue;
-						}
+					if (i.length > 0 && i.some(i => !i.matches(log))) {
+						continue;
+					}
 
-						let group: GrouperMapItem | null = null;
-						let show = true;
-						for (const i in grouperMap) {
-							if (grouperMap[i].g.matches(log)) {
-								group = grouperMap[i];
-								group.seen++;
+					let group: GrouperMapItem | null = null;
+					let show = true;
+					for (const i in grouperMap) {
+						if (grouperMap[i].g.matches(log)) {
+							group = grouperMap[i];
+							group.seen++;
 
-								group.seenElm.textContent = `Group '${group.g.pattern}' matched ${new Intl.NumberFormat().format(group.seen)} times.`;
-								if (group.seen > 1) {
-									show = false;
-								}
-								break;
+							group.seenElm.textContent = `Group '${group.g.pattern}' matched ${new Intl.NumberFormat().format(group.seen)} times.`;
+							if (group.seen > 1) {
+								show = false;
 							}
+							break;
+						}
+					}
+
+					if (!group) {
+						ungrouped++;
+					}
+
+					if (show) {
+						let logItem = document.createElement('div');
+						logItem.classList.add('log-item');
+						logItem.textContent = logEntry.getMessage();
+						if (logEntry.hasDetails()) {
+							logItem.textContent += "\n ... [details]";
 						}
 
-						if (!group) {
-							ungrouped++;
-						}
+						const dateElm = document.createElement('time');
+						const date = logEntry.getDate()
+						dateElm.dateTime = date.toISOString();
+						dateElm.textContent = date.toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short' })
+						logItem.prepend(dateElm);
 
-						if (show) {
-							let logItem = document.createElement('div');
-							logItem.classList.add('log-item');
-							logItem.textContent = logEntry.getMessage();
-							if (logEntry.hasDetails()) {
-								logItem.textContent += "\n ... [details]";
+						logItem.addEventListener('click', (e) => {
+							// this lets you select text in the log item without triggering the details dialog
+							const cellText = document.getSelection();
+							if (cellText.type === 'Range') {
+								e.stopPropagation();
+								return;
 							}
 
-							const dateElm = document.createElement('time');
-							const date = logEntry.getDate()
-							dateElm.dateTime = date.toISOString();
-							dateElm.textContent = date.toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short' })
-							logItem.prepend(dateElm);
+							this.detailsDialog.showDetails(logEntry);
+						});
 
-							logItem.addEventListener('click', (e) => {
-								// this lets you select text in the log item without triggering the details dialog
-								const cellText = document.getSelection();
-								if (cellText.type === 'Range') {
-									e.stopPropagation();
-									return;
-								}
+						if (group) {
+							const groupElm = document.createElement('article');
+							groupElm.classList.add('log-item-group');
+							groupElm.append(
+								group.seenElm,
+								(() => {
+									const elm = document.createElement('h2');
+									elm.textContent = 'Example:';
+									return elm;
+								})(),
+								document.createElement('br'),
+								logItem
+							);
 
-								this.detailsDialog.showDetails(logEntry);
-							});
-
-							if (group) {
-								const groupElm = document.createElement('article');
-								groupElm.classList.add('log-item-group');
-								groupElm.append(
-									group.seenElm,
-									(() => {
-										const elm = document.createElement('h2');
-										elm.textContent = 'Example:';
-										return elm;
-									})(),
-									document.createElement('br'),
-									logItem
-								);
-
-								this.logItemOutput.append(groupElm);
-							} else {
-								this.logItemOutput.append(logItem);
-							}
+							this.logItemOutput.append(groupElm);
+						} else {
+							this.logItemOutput.append(logItem);
 						}
 					}
 				}
@@ -246,6 +245,24 @@ export class LogReaderController extends AbstractBaseController {
 				fieldset.disabled = false;
 			}, 0);
 		});
+	}
+}
+
+async function* getAllLogs(
+	files: File[],
+	logType: LogType,
+	progress?: (numerator: number, denominator: number) => void
+): AsyncGenerator<LogEntry> {
+	for (const file of files) {
+		// this.progressbar.value = files.indexOf(file) + 1;
+
+		for await (const logEntry of getLogs(file, logType)) {
+			yield logEntry;
+		}
+
+		if (progress) {
+			progress(files.indexOf(file) + 1, files.length);
+		}
 	}
 }
 
