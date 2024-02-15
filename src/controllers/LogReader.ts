@@ -40,6 +40,7 @@ class LogDetailsDialog extends AbstractBaseController<HTMLDialogElement> {
 
 }
 
+
 export class LogReaderController extends AbstractBaseController {
 
 	private uploadButton = (() => {
@@ -142,18 +143,14 @@ export class LogReaderController extends AbstractBaseController {
 			this.logItemOutput.innerHTML = "";
 
 			setTimeout(async () => {
-				const e = matchers(this.exclusions.value, Excluder);
-				const i = matchers(this.inclusions.value, Includer);
-				const g = matchers(this.groupers.value, Grouper);
+				const e = matchers(this.exclusions.value);
+				const i = matchers(this.inclusions.value);
+				const g = matchers(this.groupers.value);
 
-				const grouperMap = g.map(g => {
-					return {
-						g: g,
-						seen: 0,
-						seenElm: document.createElement("h1"),
-					};
-				});
-				type GrouperMapItem = typeof grouperMap[number];
+				const grouperMap = g.map(g => new LogItemGroupController(g));
+				for (const i of grouperMap) {
+					this.logItemOutput.append(i.getContainer());
+				}
 
 				let ungrouped = 0;
 
@@ -174,77 +171,20 @@ export class LogReaderController extends AbstractBaseController {
 						continue;
 					}
 
-					let group: GrouperMapItem|null = null;
-					let show = true;
-					for (const i in grouperMap) {
-						if (grouperMap[i].g.matches(log)) {
-							group = grouperMap[i];
-							group.seen++;
+					const logItemController = new LogItemController(logEntry, this.detailsDialog);
 
-							group.seenElm.textContent = `Group '${group.g.pattern}' matched ${new Intl.NumberFormat().format(group.seen)} times.`;
-							if (group.seen > 1) {
-								show = false;
-							}
+					let matched = false;
+					for (const g of grouperMap) {
+						if (g.matches(log)) {
+							g.addLog(logItemController);
+							matched = true;
 							break;
 						}
 					}
 
-					if (!group) {
+					if (!matched) {
 						ungrouped++;
-					}
-
-					if (show) {
-						let logItem = document.createElement("div");
-						logItem.classList.add("log-item");
-
-						logItem.textContent = logEntry.getMessage();
-						if (logEntry.hasDetails()) {
-							logItem.textContent += "\n ... [details]";
-						}
-
-						const dateElm = document.createElement("time");
-						const date = logEntry.getDate();
-						dateElm.dateTime = date.toISOString();
-						dateElm.textContent = date.toLocaleString("en-US", {
-							year: "numeric",
-							month: "2-digit",
-							day: "2-digit",
-							hour: "2-digit",
-							minute: "2-digit",
-							second: "2-digit",
-							timeZoneName: "short"
-						});
-						logItem.prepend(dateElm);
-
-						logItem.addEventListener("click", (e) => {
-							// this lets you select text in the log item without triggering the details dialog
-							const cellText = document.getSelection();
-							if (cellText.type === "Range") {
-								e.stopPropagation();
-								return;
-							}
-
-							this.detailsDialog.showDetails(logEntry);
-						});
-
-						if (group) {
-							const groupElm = document.createElement("article");
-							groupElm.classList.add("log-item-group");
-							groupElm.append(
-								group.seenElm,
-								(() => {
-									const elm = document.createElement("h2");
-									elm.textContent = "Example:";
-									return elm;
-								})(),
-								document.createElement("br"),
-								logItem
-							);
-
-							this.logItemOutput.append(groupElm);
-						} else {
-							this.logItemOutput.append(logItem);
-						}
+						this.logItemOutput.append(logItemController.getContainer());
 					}
 				}
 
@@ -253,6 +193,116 @@ export class LogReaderController extends AbstractBaseController {
 		});
 	}
 }
+
+class LogItemGroupController extends AbstractBaseController {
+
+	private title = document.createElement("h1");
+
+	private firstLog: LogItemController|null = null;
+
+	private seen = 0;
+
+	constructor(
+		private matcher: Matcher,
+		// private titleStr: string,
+	) {
+		super("log-item-group");
+		this.container.classList.add("log-item-group"); // todo: remove this line
+
+		this.updateTitle();
+
+		this.container.append(
+			this.title,
+		);
+	}
+
+	public matches(log: string): boolean {
+		return this.matcher.matches(log);
+	}
+
+	public addLog(log: LogItemController) {
+		this.seen++;
+		this.updateTitle();
+		if (this.firstLog) {
+			return;
+		}
+		this.firstLog = log;
+		this.container.append(log.getContainer());
+	}
+
+	private titleTimeout: ReturnType<typeof setTimeout>|null = null;
+
+	private updateTitle() {
+		if (this.titleTimeout) {
+			clearTimeout(this.titleTimeout);
+		}
+
+		this.titleTimeout = setTimeout(() => {
+			this.title.innerText = `Group '${this.matcher.pattern}' matched ${new Intl.NumberFormat().format(this.seen)} times.`;
+		}, 10);
+	}
+}
+
+class LogItemController extends AbstractBaseController {
+
+	private dateElm: HTMLElement;
+
+	constructor(
+		private readonly logEntry: LogEntry,
+		detailsDialog: LogDetailsDialog,
+	) {
+		super("log-item");
+		this.container.classList.add("log-item"); // todo: remove this line
+
+		this.container.textContent = logEntry.getMessage();
+		if (logEntry.hasDetails()) {
+			this.container.textContent += "\n ... [details]";
+		}
+
+		this.dateElm = makeDate(logEntry);
+		this.container.prepend(this.dateElm);
+
+		let preventSingleClick = false;
+		let clickTimeout: ReturnType<typeof setTimeout>|null = null;
+		this.container.addEventListener("click", (e) => {
+			console.log("click", preventSingleClick);
+
+			// this lets you select text in the log item without triggering the details dialog
+			const cellText = document.getSelection();
+			if (cellText.type === "Range") {
+				return;
+			}
+
+			if (preventSingleClick) {
+				preventSingleClick = false;
+				return;
+			}
+
+			if (clickTimeout) {
+				clearTimeout(clickTimeout);
+				clickTimeout = null;
+				return;
+			}
+
+			clickTimeout = setTimeout(() => {
+				if (!preventSingleClick) {
+					detailsDialog.showDetails(logEntry);
+				}
+			}, 400);
+		});
+
+		this.container.addEventListener("dblclick", () => {
+			console.log("dblclick", preventSingleClick);
+			preventSingleClick = true;
+			if (clickTimeout) {
+				clearTimeout(clickTimeout);
+				clickTimeout = null;
+			}
+		});
+	}
+}
+
+type LogFilter = (logEntry: LogEntry) => boolean;
 
 function matchers(text: string, m: typeof Matcher = Matcher) {
 	return text.trim().split("\n").filter((v) => v.trim() != "").map(line => new m(line));
@@ -271,8 +321,19 @@ class Matcher {
 	}
 }
 
-class Grouper extends Matcher { }
-class Excluder extends Matcher { }
-class Includer extends Matcher { }
 
-
+function makeDate(logEntry: LogEntry) {
+	const dateElm = document.createElement("time");
+	const date = logEntry.getDate();
+	dateElm.dateTime = date.toISOString();
+	dateElm.textContent = date.toLocaleString("en-US", {
+		year: "numeric",
+		month: "2-digit",
+		day: "2-digit",
+		hour: "2-digit",
+		minute: "2-digit",
+		second: "2-digit",
+		timeZoneName: "short"
+	});
+	return dateElm;
+}
