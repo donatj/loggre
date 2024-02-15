@@ -1,5 +1,21 @@
 import { LogEntry, LogType } from "./logtypes/Logs";
 
+export async function* getAllLogs(
+	files: File[],
+	logType: LogType,
+	progress?: (numerator: number, denominator: number) => void
+): AsyncGenerator<LogEntry> {
+	for (const file of files) {
+		for await (const logEntry of getLogs(file, logType)) {
+			yield logEntry;
+		}
+
+		if (progress) {
+			progress(files.indexOf(file) + 1, files.length);
+		}
+	}
+}
+
 export async function* getLogs(file: File, type: LogType): AsyncGenerator<LogEntry> {
 	let log = "";
 	for await (const line of getLines(file)) {

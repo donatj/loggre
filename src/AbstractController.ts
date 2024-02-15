@@ -1,4 +1,3 @@
-
 export interface ControllerInterface<T extends HTMLElement = HTMLElement> {
 	// attach(elm: HTMLElement): void;
 	getContainer(): HTMLElement;
@@ -10,9 +9,9 @@ export abstract class AbstractBaseController<T extends HTMLElement = HTMLElement
 
 	constructor(
 		private name: string,
-		container: T | keyof HTMLElementTagNameMap = "div",
+		container: T|keyof HTMLElementTagNameMap = "div",
 	) {
-		if (typeof container === 'string') {
+		if (typeof container === "string") {
 			this.container = document.createElement(container) as T;
 		} else {
 			this.container = container;
@@ -28,17 +27,17 @@ export abstract class AbstractBaseController<T extends HTMLElement = HTMLElement
 }
 
 export function labelFor(label: string, input: HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement) {
-	if (input.id === '') {
-		input.id = makeUniqueId();		
+	if (input.id === "") {
+		input.id = makeUniqueId();
 	}
-	
-	let labelElm = document.createElement('label');
+
+	let labelElm = document.createElement("label");
 	labelElm.textContent = label;
 	labelElm.htmlFor = input.id;
-	
+
 	return [labelElm, input];
 }
 
 export function makeUniqueId() {
-	return "id-" + Math.random().toString(36).substring(2) + '-' + Date.now().toString(36);
+	return "id-" + Math.random().toString(36).substring(2) + "-" + Date.now().toString(36);
 }
