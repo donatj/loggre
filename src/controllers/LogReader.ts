@@ -100,6 +100,20 @@ export class LogReaderController extends AbstractBaseController {
 		return elm;
 	})();
 
+	private maxLogSelect = (() => {
+		let elm = document.createElement("select");
+		elm.innerHTML = `
+			<option>100</option>
+			<option>1000</option>
+			<option selected>10000</option>
+			<option>100000</option>
+			<option>1000000</option>
+			<option value="all">All</option>
+		`;
+
+		return elm;
+	})();
+
 	private progressbar = (() => {
 		let elm = document.createElement("progress");
 		elm.value = 100;
@@ -124,6 +138,7 @@ export class LogReaderController extends AbstractBaseController {
 			...labelFor("Exclusions", this.exclusions),
 			...labelFor("Inclusions", this.inclusions),
 			...labelFor("Groupers", this.groupers),
+			...labelFor("Max logs", this.maxLogSelect),
 			this.progressbar,
 			this.runButton
 		);
@@ -146,6 +161,11 @@ export class LogReaderController extends AbstractBaseController {
 				const e = matchers(this.exclusions.value);
 				const i = matchers(this.inclusions.value);
 				const g = matchers(this.groupers.value);
+
+				let maxLogs = Infinity;
+				if (this.maxLogSelect.value !== "all") {
+					maxLogs = Number(this.maxLogSelect.value);
+				}
 
 				const grouperMap = g.map(g => new LogItemGroupController(g));
 				for (const i of grouperMap) {
@@ -185,6 +205,10 @@ export class LogReaderController extends AbstractBaseController {
 					if (!matched) {
 						ungrouped++;
 						this.logItemOutput.append(logItemController.getContainer());
+					}
+
+					if (ungrouped > maxLogs) {
+						break;
 					}
 				}
 
