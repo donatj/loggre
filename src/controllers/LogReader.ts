@@ -1,7 +1,8 @@
 import { AbstractBaseController, labelFor } from "../AbstractController";
 import { PhpErrorLog } from "../logtypes/php-error";
 import { getAllLogs } from "../io";
-import { LogEntry } from "../logtypes/Logs";
+import { LogEntry, LogType } from "../logtypes/Logs";
+import { Progressbar, ProgressHandler } from "./Progress";
 
 class LogDetailsDialog extends AbstractBaseController<HTMLDialogElement> {
 
@@ -114,14 +115,7 @@ export class LogReaderController extends AbstractBaseController {
 		return elm;
 	})();
 
-	private progressbar = (() => {
-		let elm = document.createElement("progress");
-		elm.value = 100;
-		elm.max = 100;
-		elm.style.width = "100%";
-
-		return elm;
-	})();
+	private progressbar = new Progressbar();
 
 	private detailsDialog = new LogDetailsDialog;
 
@@ -139,7 +133,7 @@ export class LogReaderController extends AbstractBaseController {
 			...labelFor("Inclusions", this.inclusions),
 			...labelFor("Groupers", this.groupers),
 			...labelFor("Max logs", this.maxLogSelect),
-			this.progressbar,
+			this.progressbar.getContainer(),
 			this.runButton
 		);
 
@@ -154,67 +148,86 @@ export class LogReaderController extends AbstractBaseController {
 		});
 
 		this.runButton.addEventListener("click", async () => {
+			let maxLogs = Infinity;
+			if (this.maxLogSelect.value !== "all") {
+				maxLogs = Number(this.maxLogSelect.value);
+			}
+
 			fieldset.disabled = true;
-			this.logItemOutput.innerHTML = "";
+
+			const outputElm = this.logItemOutput;
+			const detailsDialog = this.detailsDialog;
 
 			setTimeout(async () => {
-				const e = matchers(this.exclusions.value);
-				const i = matchers(this.inclusions.value);
+				const filter = makeLogFilter(
+					matchers(this.inclusions.value),
+					matchers(this.exclusions.value)
+				);
+
 				const g = matchers(this.groupers.value);
-
-				let maxLogs = Infinity;
-				if (this.maxLogSelect.value !== "all") {
-					maxLogs = Number(this.maxLogSelect.value);
-				}
-
 				const grouperMap = g.map(g => new LogItemGroupController(g));
-				for (const i of grouperMap) {
-					this.logItemOutput.append(i.getContainer());
+				for (const gmi of grouperMap) {
+					gmi.getContainer().addEventListener("click", async () => {
+						await this.renderLog(files, logType, makeLogFilter([gmi.matcher], []), [], outputElm, maxLogs, detailsDialog, this.progressbar);
+					});
 				}
-
-				let ungrouped = 0;
 
 				const files = Array.from(this.uploadButton.files ?? []);
-				this.progressbar.style.visibility = "";
-				this.progressbar.max = files.length;
-
-				for await (const logEntry of getAllLogs(files, logType, (numerator: number, denominator: number) => {
-					this.progressbar.value = numerator;
-					this.progressbar.max = denominator;
-				})) {
-					const log = logEntry.getRawEntry();
-					if (e.some(e => e.matches(log))) {
-						continue;
-					}
-
-					if (i.length > 0 && i.some(i => !i.matches(log))) {
-						continue;
-					}
-
-					const logItemController = new LogItemController(logEntry, this.detailsDialog);
-
-					let matched = false;
-					for (const g of grouperMap) {
-						if (g.matches(log)) {
-							g.addLog(logItemController);
-							matched = true;
-							break;
-						}
-					}
-
-					if (!matched) {
-						ungrouped++;
-						this.logItemOutput.append(logItemController.getContainer());
-					}
-
-					if (ungrouped > maxLogs) {
-						break;
-					}
-				}
+				await this.renderLog(files, logType, filter, grouperMap, outputElm, maxLogs, detailsDialog, this.progressbar);
 
 				fieldset.disabled = false;
 			}, 0);
 		});
+	}
+
+	private async renderLog(
+		files: File[],
+		logType: LogType,
+		filter: LogFilter,
+		groups: LogItemGroupController[],
+		outputElm: HTMLOutputElement,
+		maxLogs: number,
+		detailsDialog: LogDetailsDialog,
+		progress: ProgressHandler,
+	) {
+		let ungrouped = 0;
+
+		outputElm.innerHTML = "";
+
+		progress.start(files.length);
+
+		for (const gmi of groups) {
+			outputElm.append(gmi.getContainer());
+		}
+
+		for await (const logEntry of getAllLogs(files, logType, progress.progress.bind(progress))) {
+			const log = logEntry.getRawEntry();
+			if (!filter(logEntry)) {
+				continue;
+			}
+
+			const logItemController = new LogItemController(logEntry, detailsDialog);
+
+			let matched = false;
+			for (const g of groups) {
+				if (g.matches(log)) {
+					g.log(logItemController);
+					matched = true;
+					break;
+				}
+			}
+
+			if (!matched) {
+				ungrouped++;
+				outputElm.append(logItemController.getContainer());
+			}
+
+			if (ungrouped > maxLogs) {
+				break;
+			}
+		}
+
+		progress.finish();
 	}
 }
 
@@ -222,12 +235,12 @@ class LogItemGroupController extends AbstractBaseController {
 
 	private title = document.createElement("h1");
 
-	private firstLog: LogItemController|null = null;
+	private firstLog: LogItemController | null = null;
 
 	private seen = 0;
 
 	constructor(
-		private matcher: Matcher,
+		public readonly matcher: Matcher,
 		// private titleStr: string,
 	) {
 		super("log-item-group");
@@ -244,7 +257,7 @@ class LogItemGroupController extends AbstractBaseController {
 		return this.matcher.matches(log);
 	}
 
-	public addLog(log: LogItemController) {
+	public log(log: LogItemController) {
 		this.seen++;
 		this.updateTitle();
 		if (this.firstLog) {
@@ -254,7 +267,7 @@ class LogItemGroupController extends AbstractBaseController {
 		this.container.append(log.getContainer());
 	}
 
-	private titleTimeout: ReturnType<typeof setTimeout>|null = null;
+	private titleTimeout: ReturnType<typeof setTimeout> | null = null;
 
 	private updateTitle() {
 		if (this.titleTimeout) {
@@ -269,10 +282,10 @@ class LogItemGroupController extends AbstractBaseController {
 
 class LogItemController extends AbstractBaseController {
 
-	private dateElm: HTMLElement;
+	private readonly dateElm: HTMLElement;
 
 	constructor(
-		private readonly logEntry: LogEntry,
+		logEntry: LogEntry,
 		detailsDialog: LogDetailsDialog,
 	) {
 		super("log-item");
@@ -287,7 +300,7 @@ class LogItemController extends AbstractBaseController {
 		this.container.prepend(this.dateElm);
 
 		let preventSingleClick = false;
-		let clickTimeout: ReturnType<typeof setTimeout>|null = null;
+		let clickTimeout: ReturnType<typeof setTimeout> | null = null;
 		this.container.addEventListener("click", (e) => {
 			console.log("click", preventSingleClick);
 
@@ -343,6 +356,17 @@ class Matcher {
 	public matches(log: string): boolean {
 		return this.reg.test(log);
 	}
+}
+
+function makeLogFilter(inclusions: Matcher[], exclusions: Matcher[]): LogFilter {
+	return (logEntry: LogEntry) => {
+		const log = logEntry.getRawEntry();
+		if (exclusions.some(e => e.matches(log))) {
+			return false;
+		}
+
+		return !(inclusions.length > 0 && inclusions.some(i => !i.matches(log)));
+	};
 }
 
 
