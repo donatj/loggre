@@ -296,7 +296,7 @@ class LogItemController extends AbstractBaseController {
 			this.container.textContent += "\n ... [details]";
 		}
 
-		this.dateElm = makeDate(logEntry);
+		this.dateElm = makeTimeElement(logEntry.getDate());
 		this.container.prepend(this.dateElm);
 
 		let preventSingleClick = false;
@@ -370,9 +370,8 @@ function makeLogFilter(inclusions: Matcher[], exclusions: Matcher[]): LogFilter 
 }
 
 
-function makeDate(logEntry: LogEntry) {
+function makeTimeElement(date: Date) {
 	const dateElm = document.createElement("time");
-	const date = logEntry.getDate();
 	dateElm.dateTime = date.toISOString();
 	dateElm.textContent = date.toLocaleString("en-US", {
 		year: "numeric",
