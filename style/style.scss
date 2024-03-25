@@ -124,16 +124,6 @@ output {
 			font-size: 1.1em;
 			margin: .4em 0;
 		}
-
-		progress {
-			visibility: hidden;
-		}
-
-		&:disabled {
-			progress {
-				visibility: visible;
-			}
-		}
 	}
 
 	> .group-run-details {

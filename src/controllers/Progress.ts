@@ -13,6 +13,7 @@ export class Progressbar extends AbstractBaseController<HTMLProgressElement> imp
 		elm.value = 0;
 		elm.max = 100;
 		elm.style.width = "100%";
+		elm.style.visibility = "hidden";
 
 		super("progressbar", elm);
 	}
