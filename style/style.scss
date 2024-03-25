@@ -134,7 +134,7 @@ output {
 
 	> .log-item-output {
 		@extend %log-text;
-		background: url(../loggre.svg) $background no-repeat center / min(10vw, 20vh);
+		background: url(../loggre.svg) $background no-repeat center / min(10vw, 20vh, 100px);
 		background-blend-mode: luminosity;
 		overflow-x: auto;
 
