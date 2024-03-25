@@ -30,35 +30,32 @@ output {
 	white-space: pre-wrap;
 }
 
-.details-dialog--controller {
-	@extend %log-text;
+%pretty-border {
+	border: 1px solid #333;
+	outline: 3px solid #3331;
+	border-radius: 4px;
+
+	&:focus {
+		border-color: #27e;
+		outline-color: #27e4;
+	}
+
+	&:hover {
+		border-color: #27e;
+		outline-color: #27e9;
+	}
+
+	&:disabled {
+		border-color: #999;
+		outline-color: #9991;
+	}
 }
 
 %pretty-inputs {
-	%pretty-border {
-		border: 1px solid #333;
-		outline: 3px solid #3331;
-		border-radius: 4px;
-
-		&:focus {
-			border-color: #27e;
-			outline-color: #27e4;
-		}
-
-		&:hover {
-			border-color: #27e;
-			outline-color: #27e9;
-		}
-
-		&:disabled {
-			border-color: #999;
-			outline-color: #9991;
-		}
-	}
 
 	textarea {
 		@extend %pretty-border;
-		
+
 		padding: .5em;
 	}
 
@@ -93,7 +90,20 @@ output {
 
 		&::file-selector-button {
 			@extend button;
+			margin-right: 1em;
+			padding-left: 1em;
+			padding-right: 1em;
 		}
+	}
+}
+
+.details-dialog--controller {
+	@extend %pretty-inputs;
+	@extend %pretty-border;
+
+	> .details-output {
+		@extend %log-text;
+		margin-top: 1em;
 	}
 }
 
@@ -129,7 +139,7 @@ output {
 	> .group-run-details {
 		background: pink;
 	}
-	
+
 	$background: #adb;
 
 	> .log-item-output {
