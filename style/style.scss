@@ -95,6 +95,11 @@ output {
 			padding-right: 1em;
 		}
 	}
+
+	input[type="datetime-local"] {
+		@extend %pretty-border;
+		padding: .5em;
+	}
 }
 
 .details-dialog--controller {

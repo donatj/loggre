@@ -32,6 +32,12 @@ class LogDetailsDialog extends AbstractBaseController<HTMLDialogElement> {
 		this.hideButton.addEventListener("click", () => {
 			this.container.close();
 		});
+
+		this.getContainer().addEventListener("click", (e) => {
+			if (e.target === this.container) {
+				this.container.close();
+			}
+		});
 	}
 
 	public showDetails(entry: LogEntry) {
@@ -85,6 +91,30 @@ export class LogReaderController extends AbstractBaseController {
 		return elm;
 	})();
 
+	private startTime = (() => {
+		let elm = document.createElement("input");
+		elm.type = "datetime-local";
+
+		elm.value = localStorage.getItem("startTime") ?? "";
+		elm.addEventListener("input", () => {
+			localStorage.setItem("startTime", elm.value);
+		});
+
+		return elm;
+	})();
+
+	private endTime = (() => {
+		let elm = document.createElement("input");
+		elm.type = "datetime-local";
+
+		elm.value = localStorage.getItem("endTime") ?? "";
+		elm.addEventListener("input", () => {
+			localStorage.setItem("endTime", elm.value);
+		});
+
+		return elm;
+	})();
+
 	private runButton = (() => {
 		let elm = document.createElement("button");
 		elm.textContent = "Run";
@@ -132,6 +162,8 @@ export class LogReaderController extends AbstractBaseController {
 			...labelFor("Exclusions", this.exclusions),
 			...labelFor("Inclusions", this.inclusions),
 			...labelFor("Groupers", this.groupers),
+			...labelFor("Start time", this.startTime),
+			...labelFor("End time", this.endTime),
 			...labelFor("Max logs", this.maxLogSelect),
 			this.progressbar.getContainer(),
 			this.runButton
@@ -158,25 +190,32 @@ export class LogReaderController extends AbstractBaseController {
 			const outputElm = this.logItemOutput;
 			const detailsDialog = this.detailsDialog;
 
-			setTimeout(async () => {
-				const filter = makeLogFilter(
-					matchers(this.inclusions.value),
-					matchers(this.exclusions.value)
-				);
+			let filter = makeLogFilter(
+				matchers(this.inclusions.value),
+				matchers(this.exclusions.value)
+			);
 
-				const g = matchers(this.groupers.value);
-				const grouperMap = g.map(g => new LogItemGroupController(g));
-				for (const gmi of grouperMap) {
-					gmi.getContainer().addEventListener("click", async () => {
-						await this.renderLog(files, logType, makeLogFilter([gmi.matcher], []), [], outputElm, maxLogs, detailsDialog, this.progressbar);
-					});
-				}
+			const start = this.startTime.value ? new Date(this.startTime.value) : null;
+			if (start) {
+				filter = AndFilter(filter, AfterFilter(start));
+			}
 
-				const files = Array.from(this.uploadButton.files ?? []);
-				await this.renderLog(files, logType, filter, grouperMap, outputElm, maxLogs, detailsDialog, this.progressbar);
+			const end = this.endTime.value ? new Date(this.endTime.value) : null;
+			if (end) {
+				filter = AndFilter(filter, BeforeFilter(end));
+			}
 
-				fieldset.disabled = false;
-			}, 0);
+			const g = matchers(this.groupers.value);
+			const grouperMap = g.map(g => new LogItemGroupController(g));
+			for (const gmi of grouperMap) {
+				gmi.getContainer().addEventListener("click", async () => {
+					await this.renderLog(files, logType, makeLogFilter([gmi.matcher], []), [], outputElm, maxLogs, detailsDialog, this.progressbar);
+				});
+			}
+
+			const files = Array.from(this.uploadButton.files ?? []);
+			await this.renderLog(files, logType, filter, grouperMap, outputElm, maxLogs, detailsDialog, this.progressbar);
+			fieldset.disabled = false;
 		});
 	}
 
@@ -200,34 +239,41 @@ export class LogReaderController extends AbstractBaseController {
 			outputElm.append(gmi.getContainer());
 		}
 
-		for await (const logEntry of getAllLogs(files, logType, progress.progress.bind(progress))) {
-			const log = logEntry.getRawEntry();
-			if (!filter(logEntry)) {
-				continue;
-			}
+		let p = new Promise<void>(async function (resolve) {
+			setTimeout(async () => {
+				for await (const logEntry of getAllLogs(files, logType, progress.progress.bind(progress))) {
+					const log = logEntry.getRawEntry();
+					if (!filter(logEntry)) {
+						continue;
+					}
 
-			const logItemController = new LogItemController(logEntry, detailsDialog);
+					const logItemController = new LogItemController(logEntry, detailsDialog);
 
-			let matched = false;
-			for (const g of groups) {
-				if (g.matches(log)) {
-					g.log(logItemController);
-					matched = true;
-					break;
+					let matched = false;
+					for (const g of groups) {
+						if (g.matches(log)) {
+							g.log(logItemController);
+							matched = true;
+							break;
+						}
+					}
+
+					if (!matched) {
+						ungrouped++;
+						outputElm.append(logItemController.getContainer());
+					}
+
+					if (ungrouped > maxLogs) {
+						break;
+					}
 				}
-			}
 
-			if (!matched) {
-				ungrouped++;
-				outputElm.append(logItemController.getContainer());
-			}
+				progress.finish();
+				resolve();
+			}, 10);
+		});
 
-			if (ungrouped > maxLogs) {
-				break;
-			}
-		}
-
-		progress.finish();
+		await p;
 	}
 }
 
@@ -367,6 +413,22 @@ function makeLogFilter(inclusions: Matcher[], exclusions: Matcher[]): LogFilter 
 
 		return !(inclusions.length > 0 && inclusions.some(i => !i.matches(log)));
 	};
+}
+
+function AfterFilter(date: Date): LogFilter {
+	return (logEntry: LogEntry) => logEntry.getDate() >= date;
+}
+
+function BeforeFilter(date: Date): LogFilter {
+	return (logEntry: LogEntry) => logEntry.getDate() <= date;
+}
+
+function AndFilter(...filters: LogFilter[]): LogFilter {
+	return (logEntry: LogEntry) => filters.every(f => f(logEntry));
+}
+
+function OrFilter(...filters: LogFilter[]): LogFilter {
+	return (logEntry: LogEntry) => filters.some(f => f(logEntry));
 }
 
 
