@@ -1,7 +1,7 @@
 import { AbstractBaseController, labelFor } from "../AbstractController";
 import { PhpErrorLog } from "../logtypes/php-error";
 import { getAllLogs } from "../io";
-import { LogEntry, LogType } from "../logtypes/Logs";
+import { AfterFilter, AndFilter, BeforeFilter, LogEntry, LogFilter, LogType } from "../logtypes/Logs";
 import { Progressbar, ProgressHandler } from "./Progress";
 
 class LogDetailsDialog extends AbstractBaseController<HTMLDialogElement> {
@@ -385,8 +385,6 @@ class LogItemController extends AbstractBaseController {
 	}
 }
 
-type LogFilter = (logEntry: LogEntry) => boolean;
-
 function matchers(text: string, m: typeof Matcher = Matcher) {
 	return text.trim().split("\n").filter((v) => v.trim() != "").map(line => new m(line));
 }
@@ -414,23 +412,6 @@ function makeLogFilter(inclusions: Matcher[], exclusions: Matcher[]): LogFilter 
 		return !(inclusions.length > 0 && inclusions.some(i => !i.matches(log)));
 	};
 }
-
-function AfterFilter(date: Date): LogFilter {
-	return (logEntry: LogEntry) => logEntry.getDate() >= date;
-}
-
-function BeforeFilter(date: Date): LogFilter {
-	return (logEntry: LogEntry) => logEntry.getDate() <= date;
-}
-
-function AndFilter(...filters: LogFilter[]): LogFilter {
-	return (logEntry: LogEntry) => filters.every(f => f(logEntry));
-}
-
-function OrFilter(...filters: LogFilter[]): LogFilter {
-	return (logEntry: LogEntry) => filters.some(f => f(logEntry));
-}
-
 
 function makeTimeElement(date: Date) {
 	const dateElm = document.createElement("time");
