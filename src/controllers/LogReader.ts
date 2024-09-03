@@ -1,7 +1,7 @@
 import { AbstractBaseController, labelFor } from "../AbstractController";
 import { PhpErrorLog } from "../logtypes/php-error";
 import { getAllLogs } from "../io";
-import { AfterFilter, AndFilter, BeforeFilter, LogEntry, LogFilter, LogType } from "../logtypes/Logs";
+import { applyFilter, AfterFilter, AndFilter, BeforeFilter, LogEntry, LogFilter, LogType } from "../logtypes/Logs";
 import { Progressbar, ProgressHandler } from "./Progress";
 
 class LogDetailsDialog extends AbstractBaseController<HTMLDialogElement> {
@@ -187,9 +187,6 @@ export class LogReaderController extends AbstractBaseController {
 
 			fieldset.disabled = true;
 
-			const outputElm = this.logItemOutput;
-			const detailsDialog = this.detailsDialog;
-
 			let filter = makeLogFilter(
 				matchers(this.inclusions.value),
 				matchers(this.exclusions.value)
@@ -209,12 +206,12 @@ export class LogReaderController extends AbstractBaseController {
 			const grouperMap = g.map(g => new LogItemGroupController(g));
 			for (const gmi of grouperMap) {
 				gmi.getContainer().addEventListener("click", async () => {
-					await this.renderLog(files, logType, makeLogFilter([gmi.matcher], []), [], outputElm, maxLogs, detailsDialog, this.progressbar);
+					await this.renderLog(files, logType, makeLogFilter([gmi.matcher], []), [], this.logItemOutput, maxLogs, this.detailsDialog, this.progressbar);
 				});
 			}
 
 			const files = Array.from(this.uploadButton.files ?? []);
-			await this.renderLog(files, logType, filter, grouperMap, outputElm, maxLogs, detailsDialog, this.progressbar);
+			await this.renderLog(files, logType, filter, grouperMap, this.logItemOutput, maxLogs, this.detailsDialog, this.progressbar);
 			fieldset.disabled = false;
 		});
 	}
@@ -241,14 +238,11 @@ export class LogReaderController extends AbstractBaseController {
 
 		let p = new Promise<void>(async function (resolve) {
 			setTimeout(async () => {
-				for await (const logEntry of getAllLogs(files, logType, progress.progress.bind(progress))) {
-					const log = logEntry.getRawEntry();
-					if (!filter(logEntry)) {
-						continue;
-					}
-
+				const logs = applyFilter(getAllLogs(files, logType), filter);
+				for await (const logEntry of logs) {
 					const logItemController = new LogItemController(logEntry, detailsDialog);
 
+					const log = logEntry.getRawEntry();
 					let matched = false;
 					for (const g of groups) {
 						if (g.matches(log)) {
