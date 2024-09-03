@@ -202,16 +202,8 @@ export class LogReaderController extends AbstractBaseController {
 				filter = AndFilter(filter, BeforeFilter(end));
 			}
 
-			const g = matchers(this.groupers.value);
-			const grouperMap = g.map(g => new LogItemGroupController(g));
-			for (const gmi of grouperMap) {
-				gmi.getContainer().addEventListener("click", async () => {
-					await this.renderLog(files, logType, makeLogFilter([gmi.matcher], []), [], this.logItemOutput, maxLogs, this.detailsDialog, this.progressbar);
-				});
-			}
-
 			const files = Array.from(this.uploadButton.files ?? []);
-			await this.renderLog(files, logType, filter, grouperMap, this.logItemOutput, maxLogs, this.detailsDialog, this.progressbar);
+			await this.renderLog(files, logType, filter, matchers(this.groupers.value), this.logItemOutput, maxLogs, this.detailsDialog, this.progressbar);
 			fieldset.disabled = false;
 		});
 	}
@@ -220,7 +212,7 @@ export class LogReaderController extends AbstractBaseController {
 		files: File[],
 		logType: LogType,
 		filter: LogFilter,
-		groups: LogItemGroupController[],
+		groupers: Matcher[],
 		outputElm: HTMLOutputElement,
 		maxLogs: number,
 		detailsDialog: LogDetailsDialog,
@@ -232,13 +224,19 @@ export class LogReaderController extends AbstractBaseController {
 
 		progress.start(files.length);
 
+		const groups = groupers.map(g => new LogItemGroupController(g));
 		for (const gmi of groups) {
+			gmi.getContainer().addEventListener("click", async () => {
+				await this.renderLog(files, logType, makeLogFilter([gmi.matcher], []), [], this.logItemOutput, maxLogs, this.detailsDialog, this.progressbar);
+			});
+
 			outputElm.append(gmi.getContainer());
 		}
 
+		const logs = applyFilter(getAllLogs(files, logType), filter);
+
 		let p = new Promise<void>(async function (resolve) {
 			setTimeout(async () => {
-				const logs = applyFilter(getAllLogs(files, logType), filter);
 				for await (const logEntry of logs) {
 					const logItemController = new LogItemController(logEntry, detailsDialog);
 
