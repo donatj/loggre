@@ -233,7 +233,7 @@ export class LogReaderController extends AbstractBaseController {
 			outputElm.append(gmi.getContainer());
 		}
 
-		const logs = applyFilter(getAllLogs(files, logType), filter);
+		const logs = applyFilter(getAllLogs(files, logType, progress.progress.bind(progress)), filter);
 
 		let p = new Promise<void>(async function (resolve) {
 			setTimeout(async () => {
