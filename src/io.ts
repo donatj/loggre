@@ -1,19 +1,29 @@
 import { LogEntry, LogType } from "./logtypes/Logs";
 
+export interface ProgressHandler {
+	start(total: number): void;
+	progress(numerator: number, denominator: number): Promise<void>;
+	finish(): void;
+}
+
 export async function* getAllLogs(
 	files: File[],
 	logType: LogType,
-	progress?: (numerator: number, denominator: number) => Promise<void>
+	progress?: ProgressHandler
 ): AsyncGenerator<LogEntry> {
+	console.log(progress)
+	progress?.start(files.length);
 	for (const file of files) {
 		for await (const logEntry of getLogs(file, logType)) {
 			yield logEntry;
 		}
 
 		if (progress) {
-			await progress(files.indexOf(file) + 1, files.length);
+			await progress.progress(files.indexOf(file) + 1, files.length);
 		}
 	}
+
+	progress?.finish();
 }
 
 export async function* getLogs(file: File, type: LogType): AsyncGenerator<LogEntry> {

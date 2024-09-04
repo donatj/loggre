@@ -1,8 +1,8 @@
 import { AbstractBaseController, labelFor } from "../AbstractController";
 import { PhpErrorLog } from "../logtypes/php-error";
-import { getAllLogs } from "../io";
+import { getAllLogs, ProgressHandler } from "../io";
 import { applyFilter, AfterFilter, AndFilter, BeforeFilter, LogEntry, LogFilter, LogType } from "../logtypes/Logs";
-import { Progressbar, ProgressHandler } from "./Progress";
+import { Progressbar } from "./Progress";
 
 class LogDetailsDialog extends AbstractBaseController<HTMLDialogElement> {
 
@@ -45,6 +45,27 @@ class LogDetailsDialog extends AbstractBaseController<HTMLDialogElement> {
 		this.container.showModal();
 	}
 
+}
+
+class LogReaderProgressHandler implements ProgressHandler {
+	constructor(
+		public readonly fieldset: HTMLFieldSetElement,
+		public readonly progressbar: Progressbar
+	) { }
+
+	start(total: number) {
+		this.fieldset.disabled = true;
+		this.progressbar.start(total);
+	}
+
+	progress(numerator: number, denominator: number) {
+		return this.progressbar.progress(numerator, denominator);
+	}
+
+	finish() {
+		this.fieldset.disabled = false;
+		this.progressbar.finish();
+	}
 }
 
 
@@ -145,7 +166,7 @@ export class LogReaderController extends AbstractBaseController {
 		return elm;
 	})();
 
-	private progressbar = new Progressbar();
+	private progressHandler = new LogReaderProgressHandler(document.createElement("fieldset"), new Progressbar);
 
 	private detailsDialog = new LogDetailsDialog;
 
@@ -154,7 +175,7 @@ export class LogReaderController extends AbstractBaseController {
 
 		const logType = new PhpErrorLog;
 
-		let fieldset = document.createElement("fieldset");
+		let fieldset = this.progressHandler.fieldset;
 
 		fieldset.append(
 			this.uploadButton,
@@ -165,7 +186,7 @@ export class LogReaderController extends AbstractBaseController {
 			...labelFor("Start time", this.startTime),
 			...labelFor("End time", this.endTime),
 			...labelFor("Max logs", this.maxLogSelect),
-			this.progressbar.getContainer(),
+			this.progressHandler.progressbar.getContainer(),
 			this.runButton
 		);
 
@@ -203,7 +224,7 @@ export class LogReaderController extends AbstractBaseController {
 			}
 
 			const files = Array.from(this.uploadButton.files ?? []);
-			await this.renderLog(files, logType, filter, matchers(this.groupers.value), this.logItemOutput, maxLogs, this.detailsDialog, this.progressbar);
+			await this.renderLog(files, logType, filter, matchers(this.groupers.value), this.logItemOutput, maxLogs, this.detailsDialog, this.progressHandler);
 			fieldset.disabled = false;
 		});
 	}
@@ -227,13 +248,13 @@ export class LogReaderController extends AbstractBaseController {
 		const groups = groupers.map(g => new LogItemGroupController(g));
 		for (const gmi of groups) {
 			gmi.getContainer().addEventListener("click", async () => {
-				await this.renderLog(files, logType, makeLogFilter([gmi.matcher], []), [], this.logItemOutput, maxLogs, this.detailsDialog, this.progressbar);
+				await this.renderLog(files, logType, makeLogFilter([gmi.matcher], []), [], this.logItemOutput, maxLogs, this.detailsDialog, this.progressHandler);
 			});
 
 			outputElm.append(gmi.getContainer());
 		}
 
-		const logs = applyFilter(getAllLogs(files, logType, progress.progress.bind(progress)), filter);
+		const logs = applyFilter(getAllLogs(files, logType, progress), filter);
 
 		for await (const logEntry of logs) {
 			const logItemController = new LogItemController(logEntry, detailsDialog);

@@ -1,10 +1,5 @@
 import { AbstractBaseController } from "../AbstractController";
-
-export interface ProgressHandler {
-	start(total: number): void;
-	progress(numerator: number, denominator: number): Promise<void>;
-	finish(): void;
-}
+import { ProgressHandler } from "../io";
 
 export class Progressbar extends AbstractBaseController<HTMLProgressElement> implements ProgressHandler {
 
