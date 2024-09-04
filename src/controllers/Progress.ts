@@ -2,7 +2,7 @@ import { AbstractBaseController } from "../AbstractController";
 
 export interface ProgressHandler {
 	start(total: number): void;
-	progress(numerator: number, denominator: number) : Promise<void>;
+	progress(numerator: number, denominator: number): Promise<void>;
 	finish(): void;
 }
 
@@ -18,20 +18,20 @@ export class Progressbar extends AbstractBaseController<HTMLProgressElement> imp
 		super("progressbar", elm);
 	}
 
-	start(total: number) {
+	public start(total: number) {
 		this.container.value = 0;
 		this.container.max = total;
 		this.container.style.visibility = "";
 	}
 
-	async progress(numerator: number, denominator: number) {
+	public async progress(numerator: number, denominator: number) {
 		this.container.value = numerator;
 		this.container.max = denominator;
 
 		await new Promise(requestAnimationFrame);
 	}
 
-	finish() {
+	public finish() {
 		this.container.value = this.container.max;
 		this.container.style.visibility = "hidden";
 	}

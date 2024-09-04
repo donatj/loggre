@@ -235,37 +235,30 @@ export class LogReaderController extends AbstractBaseController {
 
 		const logs = applyFilter(getAllLogs(files, logType, progress.progress.bind(progress)), filter);
 
-		let p = new Promise<void>(async function (resolve) {
-			setTimeout(async () => {
-				for await (const logEntry of logs) {
-					const logItemController = new LogItemController(logEntry, detailsDialog);
+		for await (const logEntry of logs) {
+			const logItemController = new LogItemController(logEntry, detailsDialog);
 
-					const log = logEntry.getRawEntry();
-					let matched = false;
-					for (const g of groups) {
-						if (g.matches(log)) {
-							g.log(logItemController);
-							matched = true;
-							break;
-						}
-					}
-
-					if (!matched) {
-						ungrouped++;
-						outputElm.append(logItemController.getContainer());
-					}
-
-					if (ungrouped > maxLogs) {
-						break;
-					}
+			const log = logEntry.getRawEntry();
+			let matched = false;
+			for (const g of groups) {
+				if (g.matches(log)) {
+					g.log(logItemController);
+					matched = true;
+					break;
 				}
+			}
 
-				progress.finish();
-				resolve();
-			}, 10);
-		});
+			if (!matched) {
+				ungrouped++;
+				outputElm.append(logItemController.getContainer());
+			}
 
-		await p;
+			if (ungrouped > maxLogs) {
+				break;
+			}
+		}
+
+		progress.finish();
 	}
 }
 
