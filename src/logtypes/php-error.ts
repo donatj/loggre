@@ -18,19 +18,25 @@ export class PhpErrorLogEntry implements LogEntry {
 		this.log = this.log.trim();
 	}
 
-	getRawEntry() : string {
+	getRawEntry(): string {
 		return this.log;
 	}
 
-	getMessage() : string {
-		return this.log.match(/(?<=] ).*/)[0];
+	getMessage(): string {
+		const match = this.log.match(/(?<=] ).*/);
+		return match ? match[0] : ""; // @todo Throw an error if no match found?
 	}
 
-	getDate() : Date {
-		return new Date(this.log.match(/\[(.*?)\]/)[1]);
+	getDate(): Date {
+		const match = this.log.match(/\[(.*?)\]/);
+		if (!match) {
+			throw new Error("Log entry does not contain a valid date format.");
+		}
+
+		return new Date(match[1]);
 	}
 
-	hasDetails() : boolean {
+	hasDetails(): boolean {
 		return this.log.includes("\n");
 	}
 

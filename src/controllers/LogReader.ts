@@ -358,7 +358,7 @@ class LogItemController extends AbstractBaseController {
 
 			// this lets you select text in the log item without triggering the details dialog
 			const cellText = document.getSelection();
-			if (cellText.type === "Range") {
+			if (cellText?.type === "Range") {
 				return;
 			}
 
