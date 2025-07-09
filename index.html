@@ -9,6 +9,10 @@
 </head>
 
 <body>Loading...</body>
-<script src="dist/main.js"></script>
+
+<script type="module">
+	import { init } from './dist/main.js';
+	init(document.body);
+</script>
 
 </html>
