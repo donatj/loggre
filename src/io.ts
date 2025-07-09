@@ -1,5 +1,5 @@
 import { LogEntry, LogType } from "./logtypes/Logs";
-import { Decompress, DecodeUTF8 } from "fflate";
+import { Decompress } from "fflate";
 
 export interface ProgressHandler {
 	start(total: number): void;
@@ -12,12 +12,9 @@ export async function* getAllLogs(
 	logType: LogType,
 	progress?: ProgressHandler
 ): AsyncGenerator<LogEntry> {
-	console.log(progress)
 	progress?.start(files.length);
 	for (const file of files) {
-		for await (const logEntry of getLogs(file, logType)) {
-			yield logEntry;
-		}
+		yield* getLogs(file, logType);
 
 		if (progress) {
 			await progress.progress(files.indexOf(file) + 1, files.length);
@@ -46,30 +43,24 @@ export async function* getLogs(file: File, type: LogType): AsyncGenerator<LogEnt
 }
 
 export async function* getLines(file: File): AsyncGenerator<string> {
-	const reader = file.stream().getReader();
-
-	// Read the first chunk to check for gzip magic bytes
-	let { value: firstChunk, done: readerDone } = await reader.read();
-	if (!firstChunk) {
-		return;
-	}
-
-	// Check if file is gzipped by looking for magic bytes (0x1f, 0x8b)
-	const isGzipped = firstChunk.length >= 2 && firstChunk[0] === 0x1f && firstChunk[1] === 0x8b;
+	const header = new Uint8Array(await file.slice(0, 2).arrayBuffer());
+	const isGzipped = header[0] === 0x1f && header[1] === 0x8b;
 
 	if (isGzipped) {
 		// Handle gzipped content using fflate streaming
-		yield* getLinesFromGzipped(reader, firstChunk);
+		yield* getLinesFromGzipped(file);
 	} else {
 		// Handle uncompressed content
-		yield* getLinesFromUncompressed(reader, firstChunk, readerDone);
+		yield* getLinesFromUncompressed(file);
 	}
 }
 
 async function* getLinesFromGzipped(
-	reader: ReadableStreamDefaultReader<Uint8Array>,
-	firstChunk: Uint8Array
+	file: File
 ): AsyncGenerator<string> {
+	const reader = file.stream().getReader();
+	const decoder = new TextDecoder("utf-8");
+
 	let textBuffer = "";
 	let isDecompressionComplete = false;
 	let decompressError: Error | null = null;
@@ -78,7 +69,6 @@ async function* getLinesFromGzipped(
 	const decompress = new Decompress((chunk, final) => {
 		if (chunk) {
 			// Decode the decompressed chunk to text
-			const decoder = new TextDecoder("utf-8");
 			const text = decoder.decode(chunk, { stream: !final });
 			textBuffer += text;
 		}
@@ -87,16 +77,13 @@ async function* getLinesFromGzipped(
 		}
 	});
 
-	// Process the first chunk
-	try {
-		decompress.push(firstChunk);
-	} catch (err) {
-		decompressError = err instanceof Error ? err : new Error(String(err));
-	}
-
-	// Continue reading and decompressing
+	// Process chunks from the stream
 	let readerDone = false;
-	while (!readerDone && !isDecompressionComplete && !decompressError) {
+	while (true) {
+		if (readerDone || isDecompressionComplete || decompressError) {
+			break;
+		}
+
 		const { value: chunk, done } = await reader.read();
 		readerDone = done;
 
@@ -128,13 +115,13 @@ async function* getLinesFromGzipped(
 }
 
 async function* getLinesFromUncompressed(
-	reader: ReadableStreamDefaultReader<Uint8Array>,
-	firstChunk: Uint8Array,
-	initialReaderDone: boolean
+	file: File
 ): AsyncGenerator<string> {
+	const reader = file.stream().getReader();
 	const decoder = new TextDecoder("utf-8");
-	let chunkText = decoder.decode(firstChunk, { stream: true });
-	let readerDone = initialReaderDone;
+
+	let { value: rawChunk, done: readerDone } = await reader.read();
+	let chunkText = rawChunk ? decoder.decode(rawChunk, { stream: true }) : "";
 
 	const re = /\r\n|\n|\r/gm;
 	let startIndex = 0;
@@ -146,9 +133,9 @@ async function* getLinesFromUncompressed(
 				break;
 			}
 			const remainder = chunkText.substr(startIndex);
-			const { value: rawChunk, done } = await reader.read();
+			const { value: newRawChunk, done } = await reader.read();
 			readerDone = done;
-			chunkText = remainder + (rawChunk ? decoder.decode(rawChunk, { stream: true }) : "");
+			chunkText = remainder + (newRawChunk ? decoder.decode(newRawChunk, { stream: true }) : "");
 			startIndex = 0;
 			continue;
 		}
@@ -167,7 +154,11 @@ function* extractLinesFromBuffer(buffer: string, isFinal: boolean): Generator<st
 	let startIndex = 0;
 	let result;
 
-	while ((result = re.exec(buffer)) !== null) {
+	while (true) {
+		result = re.exec(buffer);
+		if (result === null) {
+			break;
+		}
 		yield buffer.substring(startIndex, result.index);
 		startIndex = re.lastIndex;
 	}
@@ -181,9 +172,12 @@ function* extractLinesFromBuffer(buffer: string, isFinal: boolean): Generator<st
 function getRemainingBuffer(buffer: string): string {
 	const re = /\r\n|\n|\r/gm;
 	let lastNewlineIndex = -1;
-	let result;
 
-	while ((result = re.exec(buffer)) !== null) {
+	while (true) {
+		const result = re.exec(buffer);
+		if (result === null) {
+			break;
+		}
 		lastNewlineIndex = re.lastIndex;
 	}
 
