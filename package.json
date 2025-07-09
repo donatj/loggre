@@ -14,13 +14,14 @@
     "test:ci": "jest --ci --coverage --watchAll=false",
     "lint": "echo 'No linter configured yet'",
     "lint:fix": "echo 'No linter configured yet'",
-    "build": "rollup -c",
+    "build": "rollup -c && npm run build-sass",
     "build:dev": "rollup -c --watch",
     "build:prod": "NODE_ENV=production rollup -c",
-    "_site": "npm run clean && npm run build && rm -rf _site && mkdir _site && cp -r index.html *.md *.svg dist _site/",
+    "_site": "npm run clean && npm run build && rm -rf _site && mkdir _site && cp -r index.html *.md *.svg dist style _site/",
     "watch": "rollup -c --watch",
-    "clean": "rm -rf dist coverage",
-    "pretest": "npm run clean"
+    "clean": "rm -rf dist coverage _site",
+    "pretest": "npm run clean",
+    "build-sass": "sass style/style.scss:style/style.css"
   },
   "author": "",
   "license": "MIT",
