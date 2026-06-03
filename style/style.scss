@@ -1,4 +1,5 @@
-@import "reset";
+@use "sass:color";
+@use "reset";
 
 * {
 	box-sizing: border-box;
@@ -168,7 +169,7 @@ output {
 			background: $background;
 
 			&:hover {
-				background: darken($background, 10%);
+				background: color.adjust($background, $lightness: -10%);
 			}
 		}
 
@@ -176,7 +177,7 @@ output {
 			background: lightgreen;
 
 			&:hover {
-				background: darken(lightgreen, 10%);
+				background: color.adjust(lightgreen, $lightness: -10%);
 			}
 		}
 
