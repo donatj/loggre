@@ -1,5 +1,6 @@
 import { AbstractBaseController, labelFor } from "../AbstractController";
 import { PhpErrorLog } from "../logtypes/php-error";
+import { NginxErrorLog } from "../logtypes/nginx-error"
 import { getAllLogs, ProgressHandler } from "../io";
 import { applyFilter, AfterFilter, AndFilter, BeforeFilter, LogEntry, LogFilter, LogType } from "../logtypes/Logs";
 import { Progressbar } from "./Progress";
@@ -75,6 +76,16 @@ export class LogReaderController extends AbstractBaseController {
 		let elm = document.createElement("input");
 		elm.type = "file";
 		elm.multiple = true;
+
+		return elm;
+	})();
+
+	private logType = (()=>{
+		let elm = document.createElement("select");
+		elm.innerHTML = `
+			<option value="php">PHP Error</option>
+			<option value="nginx">Nginx Error</option>
+		`;
 
 		return elm;
 	})();
@@ -173,13 +184,12 @@ export class LogReaderController extends AbstractBaseController {
 	constructor() {
 		super("log-reader", "main");
 
-		const logType = new PhpErrorLog;
-
 		let fieldset = this.progressHandler.fieldset;
 
 		fieldset.append(
 			this.uploadButton,
 			document.createElement("br"),
+			...labelFor("Log Type", this.logType),
 			...labelFor("Exclusions", this.exclusions),
 			...labelFor("Inclusions", this.inclusions),
 			...labelFor("Groupers", this.groupers),
@@ -224,6 +234,7 @@ export class LogReaderController extends AbstractBaseController {
 			}
 
 			const files = Array.from(this.uploadButton.files ?? []);
+			const logType = this.logType.value === "nginx" ? new NginxErrorLog() : new PhpErrorLog();
 			await this.renderLog(files, logType, filter, matchers(this.groupers.value), this.logItemOutput, maxLogs, this.detailsDialog, this.progressHandler);
 			fieldset.disabled = false;
 		});
