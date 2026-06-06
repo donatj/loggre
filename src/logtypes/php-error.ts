@@ -30,10 +30,15 @@ export class PhpErrorLogEntry implements LogEntry {
 	getDate(): Date {
 		const match = this.log.match(/\[(.*?)\]/);
 		if (!match) {
-			throw new Error("Log entry does not contain a valid date format.");
+			throw new Error("Log entry does not contain a valid date.");
 		}
 
-		return new Date(match[1]);
+		const date = new Date(match[1]);
+		if (isNaN(date.getTime())) {
+			throw new Error("Log entry does not contain a valid date format: " + match[1]);
+		}
+
+		return date;
 	}
 
 	hasDetails(): boolean {
