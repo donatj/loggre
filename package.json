@@ -39,6 +39,6 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "fflate": "^0.8.2"
+    "fflate": "^0.8.3"
   }
 }
