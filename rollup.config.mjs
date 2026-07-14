@@ -1,4 +1,4 @@
-import typescript from '@rollup/plugin-typescript';
+import esbuild from 'rollup-plugin-esbuild';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import terser from '@rollup/plugin-terser';
@@ -20,9 +20,9 @@ export default {
 			preferBuiltins: false
 		}),
 		commonjs(),
-		typescript({
-			sourceMap: true,
-			inlineSources: false
+		esbuild({
+			target: 'es2020',
+			sourceMap: true
 		}),
 
 		// production && terser()
