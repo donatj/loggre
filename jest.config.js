@@ -1,10 +1,15 @@
 module.exports = {
-  preset: 'ts-jest',
   testEnvironment: 'node',
   roots: ['<rootDir>/src'],
   testMatch: ['**/__tests__/**/*.test.ts', '**/?(*.)+(spec|test).ts'],
   transform: {
-    '^.+\\.ts$': 'ts-jest',
+    '^.+\\.ts$': ['@swc/jest', {
+      jsc: {
+        parser: { syntax: 'typescript' },
+        target: 'es2020'
+      },
+      module: { type: 'commonjs' }
+    }],
   },
   collectCoverageFrom: [
     'src/**/*.{ts,js}',
