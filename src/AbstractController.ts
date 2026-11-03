@@ -1,15 +1,16 @@
-export interface ControllerInterface<T extends HTMLElement = HTMLElement> {
+export interface ControllerInterface<_T extends HTMLElement = HTMLElement> {
 	// attach(elm: HTMLElement): void;
 	getContainer(): HTMLElement;
 }
 
-export abstract class AbstractBaseController<T extends HTMLElement = HTMLElement> implements ControllerInterface<T> {
-
+export abstract class AbstractBaseController<
+	T extends HTMLElement = HTMLElement,
+> implements ControllerInterface<T> {
 	protected container: T;
 
 	constructor(
 		private name: string,
-		container: T|keyof HTMLElementTagNameMap = "div",
+		container: T | keyof HTMLElementTagNameMap = "div",
 	) {
 		if (typeof container === "string") {
 			this.container = document.createElement(container) as T;
@@ -23,10 +24,12 @@ export abstract class AbstractBaseController<T extends HTMLElement = HTMLElement
 	public getContainer() {
 		return this.container;
 	}
-
 }
 
-export function labelFor(label: string, input: HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement) {
+export function labelFor(
+	label: string,
+	input: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
+) {
 	if (input.id === "") {
 		input.id = makeUniqueId();
 	}
@@ -39,5 +42,10 @@ export function labelFor(label: string, input: HTMLInputElement|HTMLTextAreaElem
 }
 
 export function makeUniqueId() {
-	return "id-" + Math.random().toString(36).substring(2) + "-" + Date.now().toString(36);
+	return (
+		"id-" +
+		Math.random().toString(36).substring(2) +
+		"-" +
+		Date.now().toString(36)
+	);
 }

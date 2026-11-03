@@ -10,7 +10,7 @@ export interface ProgressHandler {
 export async function* getAllLogs(
 	files: File[],
 	logType: LogType,
-	progress?: ProgressHandler
+	progress?: ProgressHandler,
 ): AsyncGenerator<LogEntry> {
 	progress?.start(files.length);
 	for (const file of files) {
@@ -24,7 +24,10 @@ export async function* getAllLogs(
 	progress?.finish();
 }
 
-export async function* getLogs(file: File, type: LogType): AsyncGenerator<LogEntry> {
+export async function* getLogs(
+	file: File,
+	type: LogType,
+): AsyncGenerator<LogEntry> {
 	let log = "";
 	for await (const line of getLines(file)) {
 		if (type.looksLikeLogLine(line)) {
@@ -55,9 +58,7 @@ export async function* getLines(file: File): AsyncGenerator<string> {
 	}
 }
 
-async function* getLinesFromGzipped(
-	file: File
-): AsyncGenerator<string> {
+async function* getLinesFromGzipped(file: File): AsyncGenerator<string> {
 	const reader = file.stream().getReader();
 	const decoder = new TextDecoder("utf-8");
 
@@ -114,9 +115,7 @@ async function* getLinesFromGzipped(
 	}
 }
 
-async function* getLinesFromUncompressed(
-	file: File
-): AsyncGenerator<string> {
+async function* getLinesFromUncompressed(file: File): AsyncGenerator<string> {
 	const reader = file.stream().getReader();
 	const decoder = new TextDecoder("utf-8");
 
@@ -135,7 +134,9 @@ async function* getLinesFromUncompressed(
 			const remainder = chunkText.substr(startIndex);
 			const { value: newRawChunk, done } = await reader.read();
 			readerDone = done;
-			chunkText = remainder + (newRawChunk ? decoder.decode(newRawChunk, { stream: true }) : "");
+			chunkText =
+				remainder +
+				(newRawChunk ? decoder.decode(newRawChunk, { stream: true }) : "");
 			startIndex = 0;
 			continue;
 		}
@@ -149,7 +150,10 @@ async function* getLinesFromUncompressed(
 	}
 }
 
-function* extractLinesFromBuffer(buffer: string, isFinal: boolean): Generator<string> {
+function* extractLinesFromBuffer(
+	buffer: string,
+	isFinal: boolean,
+): Generator<string> {
 	const re = /\r\n|\n|\r/gm;
 	let startIndex = 0;
 	let result;

@@ -1,8 +1,10 @@
 import { AbstractBaseController } from "../AbstractController";
 import { ProgressHandler } from "../io";
 
-export class Progressbar extends AbstractBaseController<HTMLProgressElement> implements ProgressHandler {
-
+export class Progressbar
+	extends AbstractBaseController<HTMLProgressElement>
+	implements ProgressHandler
+{
 	constructor() {
 		let elm = document.createElement("progress");
 		elm.value = 0;
@@ -30,5 +32,4 @@ export class Progressbar extends AbstractBaseController<HTMLProgressElement> imp
 		this.container.value = this.container.max;
 		this.container.style.visibility = "hidden";
 	}
-
 }

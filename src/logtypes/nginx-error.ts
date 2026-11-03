@@ -1,19 +1,16 @@
 import { LogEntry, LogType } from "./Logs";
 
 export class NginxErrorLog implements LogType {
-
 	looksLikeLogLine(line: string): boolean {
-		return /^\d\d\d\d\/\d\d\/\d\d \d\d:\d\d:\d\d \[/.test(line)
+		return /^\d\d\d\d\/\d\d\/\d\d \d\d:\d\d:\d\d \[/.test(line);
 	}
 
 	parseLogLine(line: string): LogEntry {
 		return new NginxErrorLogEntry(line);
 	}
-
 }
 
 export class NginxErrorLogEntry implements LogEntry {
-
 	constructor(public readonly log: string) {
 		this.log = this.log.trim();
 	}
@@ -32,7 +29,9 @@ export class NginxErrorLogEntry implements LogEntry {
 		if (match != null && match[1] !== undefined) {
 			const date = new Date(match[1]);
 			if (isNaN(date.getTime())) {
-				throw new Error("Log entry does not contain a valid date format: " + match[1]);
+				throw new Error(
+					"Log entry does not contain a valid date format: " + match[1],
+				);
 			}
 
 			return date;
@@ -44,5 +43,4 @@ export class NginxErrorLogEntry implements LogEntry {
 	hasDetails(): boolean {
 		return this.log.includes("\n");
 	}
-
 }
