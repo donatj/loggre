@@ -12,8 +12,8 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:ci": "jest --ci --coverage --watchAll=false",
-    "lint": "oxlint src",
-    "lint:fix": "oxlint --fix src",
+    "lint": "oxlint --config oxlint.config.mjs src",
+    "lint:fix": "oxlint --config oxlint.config.mjs --fix src",
     "build": "rollup -c && npm run build-sass",
     "build:dev": "rollup -c --watch",
     "build:prod": "NODE_ENV=production rollup -c",
@@ -22,8 +22,8 @@
     "clean": "rm -rf dist coverage _site",
     "pretest": "npm run clean",
     "build-sass": "sass style/style.scss:style/style.css",
-    "format": "oxfmt --ignore-path .oxfmtignore --write src",
-    "format:check": "oxfmt --ignore-path .oxfmtignore --check src"
+    "format": "oxfmt --config oxfmt.config.mjs --ignore-path .oxfmtignore --write src",
+    "format:check": "oxfmt --config oxfmt.config.mjs --ignore-path .oxfmtignore --check src"
   },
   "author": "",
   "license": "MIT",
