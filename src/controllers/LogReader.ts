@@ -1,12 +1,19 @@
 import { AbstractBaseController, labelFor } from "../AbstractController";
 import { PhpErrorLog } from "../logtypes/php-error";
-import { NginxErrorLog } from "../logtypes/nginx-error"
+import { NginxErrorLog } from "../logtypes/nginx-error";
 import { getAllLogs, ProgressHandler } from "../io";
-import { applyFilter, AfterFilter, AndFilter, BeforeFilter, LogEntry, LogFilter, LogType } from "../logtypes/Logs";
+import {
+	applyFilter,
+	AfterFilter,
+	AndFilter,
+	BeforeFilter,
+	LogEntry,
+	LogFilter,
+	LogType,
+} from "../logtypes/Logs";
 import { Progressbar } from "./Progress";
 
 class LogDetailsDialog extends AbstractBaseController<HTMLDialogElement> {
-
 	private output = (() => {
 		let elm = document.createElement("output");
 		elm.classList.add("details-output");
@@ -25,10 +32,7 @@ class LogDetailsDialog extends AbstractBaseController<HTMLDialogElement> {
 	constructor() {
 		super("details-dialog", document.createElement("dialog"));
 
-		this.container.append(
-			this.hideButton,
-			this.output
-		);
+		this.container.append(this.hideButton, this.output);
 
 		this.hideButton.addEventListener("click", () => {
 			this.container.close();
@@ -45,14 +49,13 @@ class LogDetailsDialog extends AbstractBaseController<HTMLDialogElement> {
 		this.output.textContent = entry.getRawEntry();
 		this.container.showModal();
 	}
-
 }
 
 class LogReaderProgressHandler implements ProgressHandler {
 	constructor(
 		public readonly fieldset: HTMLFieldSetElement,
-		public readonly progressbar: Progressbar
-	) { }
+		public readonly progressbar: Progressbar,
+	) {}
 
 	start(total: number) {
 		this.fieldset.disabled = true;
@@ -69,9 +72,7 @@ class LogReaderProgressHandler implements ProgressHandler {
 	}
 }
 
-
 export class LogReaderController extends AbstractBaseController {
-
 	private uploadButton = (() => {
 		let elm = document.createElement("input");
 		elm.type = "file";
@@ -80,7 +81,7 @@ export class LogReaderController extends AbstractBaseController {
 		return elm;
 	})();
 
-	private logType = (()=>{
+	private logType = (() => {
 		let elm = document.createElement("select");
 		elm.innerHTML = `
 			<option value="php">PHP Error</option>
@@ -177,9 +178,12 @@ export class LogReaderController extends AbstractBaseController {
 		return elm;
 	})();
 
-	private progressHandler = new LogReaderProgressHandler(document.createElement("fieldset"), new Progressbar);
+	private progressHandler = new LogReaderProgressHandler(
+		document.createElement("fieldset"),
+		new Progressbar(),
+	);
 
-	private detailsDialog = new LogDetailsDialog;
+	private detailsDialog = new LogDetailsDialog();
 
 	constructor() {
 		super("log-reader", "main");
@@ -197,13 +201,13 @@ export class LogReaderController extends AbstractBaseController {
 			...labelFor("End time", this.endTime),
 			...labelFor("Max logs", this.maxLogSelect),
 			this.progressHandler.progressbar.getContainer(),
-			this.runButton
+			this.runButton,
 		);
 
 		this.container.append(
 			fieldset,
 			this.logItemOutput,
-			this.detailsDialog.getContainer()
+			this.detailsDialog.getContainer(),
 		);
 
 		this.uploadButton.addEventListener("change", () => {
@@ -220,10 +224,12 @@ export class LogReaderController extends AbstractBaseController {
 
 			let filter = makeLogFilter(
 				matchers(this.inclusions.value),
-				matchers(this.exclusions.value)
+				matchers(this.exclusions.value),
 			);
 
-			const start = this.startTime.value ? new Date(this.startTime.value) : null;
+			const start = this.startTime.value
+				? new Date(this.startTime.value)
+				: null;
 			if (start) {
 				filter = AndFilter(filter, AfterFilter(start));
 			}
@@ -234,8 +240,20 @@ export class LogReaderController extends AbstractBaseController {
 			}
 
 			const files = Array.from(this.uploadButton.files ?? []);
-			const logType = this.logType.value === "nginx" ? new NginxErrorLog() : new PhpErrorLog();
-			await this.renderLog(files, logType, filter, matchers(this.groupers.value), this.logItemOutput, maxLogs, this.detailsDialog, this.progressHandler);
+			const logType =
+				this.logType.value === "nginx"
+					? new NginxErrorLog()
+					: new PhpErrorLog();
+			await this.renderLog(
+				files,
+				logType,
+				filter,
+				matchers(this.groupers.value),
+				this.logItemOutput,
+				maxLogs,
+				this.detailsDialog,
+				this.progressHandler,
+			);
 			fieldset.disabled = false;
 		});
 	}
@@ -256,10 +274,19 @@ export class LogReaderController extends AbstractBaseController {
 
 		progress.start(files.length);
 
-		const groups = groupers.map(g => new LogItemGroupController(g));
+		const groups = groupers.map((g) => new LogItemGroupController(g));
 		for (const gmi of groups) {
 			gmi.getContainer().addEventListener("click", async () => {
-				await this.renderLog(files, logType, makeLogFilter([gmi.matcher], []), [], this.logItemOutput, maxLogs, this.detailsDialog, this.progressHandler);
+				await this.renderLog(
+					files,
+					logType,
+					makeLogFilter([gmi.matcher], []),
+					[],
+					this.logItemOutput,
+					maxLogs,
+					this.detailsDialog,
+					this.progressHandler,
+				);
 			});
 
 			outputElm.append(gmi.getContainer());
@@ -295,7 +322,6 @@ export class LogReaderController extends AbstractBaseController {
 }
 
 class LogItemGroupController extends AbstractBaseController {
-
 	private title = document.createElement("h1");
 
 	private firstLog: LogItemController | null = null;
@@ -311,9 +337,7 @@ class LogItemGroupController extends AbstractBaseController {
 
 		this.updateTitle();
 
-		this.container.append(
-			this.title,
-		);
+		this.container.append(this.title);
 	}
 
 	public matches(log: string): boolean {
@@ -344,13 +368,9 @@ class LogItemGroupController extends AbstractBaseController {
 }
 
 class LogItemController extends AbstractBaseController {
-
 	private readonly dateElm: HTMLElement;
 
-	constructor(
-		logEntry: LogEntry,
-		detailsDialog: LogDetailsDialog,
-	) {
+	constructor(logEntry: LogEntry, detailsDialog: LogDetailsDialog) {
 		super("log-item");
 		this.container.classList.add("log-item"); // todo: remove this line
 
@@ -364,7 +384,7 @@ class LogItemController extends AbstractBaseController {
 
 		let preventSingleClick = false;
 		let clickTimeout: ReturnType<typeof setTimeout> | null = null;
-		this.container.addEventListener("click", (e) => {
+		this.container.addEventListener("click", () => {
 			console.log("click", preventSingleClick);
 
 			// this lets you select text in the log item without triggering the details dialog
@@ -403,11 +423,14 @@ class LogItemController extends AbstractBaseController {
 }
 
 function matchers(text: string, m: typeof Matcher = Matcher) {
-	return text.trim().split("\n").filter((v) => v.trim() != "").map(line => new m(line));
+	return text
+		.trim()
+		.split("\n")
+		.filter((v) => v.trim() != "")
+		.map((line) => new m(line));
 }
 
 class Matcher {
-
 	private reg: RegExp;
 
 	constructor(public readonly pattern: string) {
@@ -419,14 +442,17 @@ class Matcher {
 	}
 }
 
-function makeLogFilter(inclusions: Matcher[], exclusions: Matcher[]): LogFilter {
+function makeLogFilter(
+	inclusions: Matcher[],
+	exclusions: Matcher[],
+): LogFilter {
 	return (logEntry: LogEntry) => {
 		const log = logEntry.getRawEntry();
-		if (exclusions.some(e => e.matches(log))) {
+		if (exclusions.some((e) => e.matches(log))) {
 			return false;
 		}
 
-		return !(inclusions.length > 0 && inclusions.some(i => !i.matches(log)));
+		return !inclusions.some((i) => !i.matches(log));
 	};
 }
 
@@ -440,7 +466,7 @@ function makeTimeElement(date: Date) {
 		hour: "2-digit",
 		minute: "2-digit",
 		second: "2-digit",
-		timeZoneName: "short"
+		timeZoneName: "short",
 	});
 	return dateElm;
 }
