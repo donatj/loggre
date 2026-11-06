@@ -10,6 +10,11 @@ updates:
     versioning-strategy: "increase"
     schedule:
       interval: "weekly"
+    groups:
+      oxc:
+        patterns:
+          - "oxlint"
+          - "oxfmt"
 
   - package-ecosystem: "github-actions"
     directory: "/"
